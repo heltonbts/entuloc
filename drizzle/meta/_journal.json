@@ -15,6 +15,13 @@
       "when": 1789733773169,
       "tag": "0001_heavy_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789758885353,
+      "tag": "0002_spooky_thunderball",
+      "breakpoints": true
     }
   ]
 }

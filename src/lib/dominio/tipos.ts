@@ -161,6 +161,10 @@ export type Permissao =
   | 'multas.editar'
   | 'usuarios.gerenciar'
   | 'financeiro.ver'
+  | 'financeiro.registrar'
+  | 'materiais.editar'
+  | 'vendas.registrar'
+  | 'locacoes.fechar'
   | 'frota.editar'
   | 'clientes.editar'
   | 'locacoes.criar'
@@ -176,6 +180,10 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'multas.editar',
     'usuarios.gerenciar',
     'financeiro.ver',
+    'financeiro.registrar',
+    'materiais.editar',
+    'vendas.registrar',
+    'locacoes.fechar',
     'frota.editar',
     'clientes.editar',
     'locacoes.criar',
@@ -183,6 +191,7 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'coletas.registrar',
   ],
   funcionario: [
+    'vendas.registrar',
     'frota.editar',
     'clientes.editar',
     'locacoes.criar',

@@ -8,6 +8,9 @@ import { exigirSessao } from '@/server/auth/guarda';
 
 const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
   { href: '/painel', rotulo: 'Painel' },
+  { href: '/locacoes', rotulo: 'Locações', exige: 'locacoes.ver' },
+  { href: '/clientes', rotulo: 'Clientes', exige: 'clientes.editar' },
+  { href: '/financeiro', rotulo: 'Financeiro', exige: 'financeiro.ver' },
   { href: '/cadastros/tipos', rotulo: 'Tipos de caçamba', exige: 'precos.editar' },
   { href: '/cadastros/frota', rotulo: 'Frota', exige: 'frota.editar' },
   { href: '/cadastros/cidades', rotulo: 'Cidades e frete', exige: 'cidades.editar' },

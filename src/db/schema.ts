@@ -276,3 +276,130 @@ export const locacoesRelations = relations(locacoes, ({ one }) => ({
   }),
   criadoPor: one(usuarios, { fields: [locacoes.criadoPorId], references: [usuarios.id] }),
 }));
+
+/* ------------------------------------------------------------------ *
+ * Financeiro
+ * ------------------------------------------------------------------ */
+
+export const unidadeMaterialEnum = pgEnum('unidade_material', ['tonelada', 'metro_cubico']);
+export const formaPagamentoEnum = pgEnum('forma_pagamento', [
+  'dinheiro',
+  'pix',
+  'boleto',
+  'cartao',
+  'transferencia',
+]);
+export const origemCobrancaEnum = pgEnum('origem_cobranca', ['locacao', 'venda_material']);
+
+/** Materiais reciclados que a EntuLoc revende. */
+export const materiais = pgTable(
+  'materiais',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nome: text('nome').notNull().unique(),
+    unidade: unidadeMaterialEnum('unidade').notNull().default('tonelada'),
+    /** Preco por unidade, em centavos. */
+    precoUnitario: integer('preco_unitario').notNull(),
+    ativo: boolean('ativo').notNull().default(true),
+    criadoEm,
+    atualizadoEm,
+  },
+  (t) => [check('materiais_preco_nao_negativo', sql`${t.precoUnitario} >= 0`)],
+);
+
+export const vendasMaterial = pgTable(
+  'vendas_material',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    clienteId: uuid('cliente_id')
+      .notNull()
+      .references(() => clientes.id, { onDelete: 'restrict' }),
+    materialId: uuid('material_id')
+      .notNull()
+      .references(() => materiais.id, { onDelete: 'restrict' }),
+    quantidade: numeric('quantidade', { precision: 12, scale: 3 }).notNull(),
+    /** Congelado na venda: mudar a tabela depois nao altera venda passada. */
+    precoUnitario: integer('preco_unitario').notNull(),
+    valorTotal: integer('valor_total').notNull(),
+    vendidaEm: date('vendida_em').notNull(),
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+    criadoEm,
+  },
+  (t) => [
+    check('vendas_quantidade_positiva', sql`${t.quantidade} > 0`),
+    check('vendas_valores_nao_negativos', sql`${t.precoUnitario} >= 0 AND ${t.valorTotal} >= 0`),
+  ],
+);
+
+/**
+ * Conta a receber.
+ *
+ * Nasce do fechamento de uma locacao ou de uma venda de material. O saldo NAO
+ * fica guardado aqui: e sempre `valorTotal - soma(recebimentos)`, calculado na
+ * hora. Guardar saldo em coluna e convite para ele divergir dos lancamentos.
+ */
+export const cobrancas = pgTable(
+  'cobrancas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    clienteId: uuid('cliente_id')
+      .notNull()
+      .references(() => clientes.id, { onDelete: 'restrict' }),
+    origem: origemCobrancaEnum('origem').notNull(),
+    locacaoId: uuid('locacao_id').references(() => locacoes.id, { onDelete: 'restrict' }),
+    vendaId: uuid('venda_id').references(() => vendasMaterial.id, { onDelete: 'restrict' }),
+    descricao: text('descricao').notNull(),
+    valorTotal: integer('valor_total').notNull(),
+    vencimentoEm: date('vencimento_em').notNull(),
+    cancelada: boolean('cancelada').notNull().default(false),
+    criadoEm,
+    atualizadoEm,
+  },
+  (t) => [
+    check('cobrancas_valor_positivo', sql`${t.valorTotal} > 0`),
+    // Uma cobranca aponta para a locacao OU para a venda que a originou —
+    // nunca as duas, nunca nenhuma.
+    check(
+      'cobrancas_origem_coerente',
+      sql`(${t.origem} = 'locacao' AND ${t.locacaoId} IS NOT NULL AND ${t.vendaId} IS NULL)
+       OR (${t.origem} = 'venda_material' AND ${t.vendaId} IS NOT NULL AND ${t.locacaoId} IS NULL)`,
+    ),
+  ],
+);
+
+export const recebimentos = pgTable(
+  'recebimentos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    cobrancaId: uuid('cobranca_id')
+      .notNull()
+      .references(() => cobrancas.id, { onDelete: 'cascade' }),
+    valor: integer('valor').notNull(),
+    forma: formaPagamentoEnum('forma').notNull(),
+    recebidoEm: date('recebido_em').notNull(),
+    observacoes: text('observacoes'),
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+    criadoEm,
+  },
+  (t) => [check('recebimentos_valor_positivo', sql`${t.valor} > 0`)],
+);
+
+export const cobrancasRelations = relations(cobrancas, ({ one, many }) => ({
+  cliente: one(clientes, { fields: [cobrancas.clienteId], references: [clientes.id] }),
+  locacao: one(locacoes, { fields: [cobrancas.locacaoId], references: [locacoes.id] }),
+  venda: one(vendasMaterial, { fields: [cobrancas.vendaId], references: [vendasMaterial.id] }),
+  recebimentos: many(recebimentos),
+}));
+
+export const recebimentosRelations = relations(recebimentos, ({ one }) => ({
+  cobranca: one(cobrancas, { fields: [recebimentos.cobrancaId], references: [cobrancas.id] }),
+}));
+
+export const vendasMaterialRelations = relations(vendasMaterial, ({ one }) => ({
+  cliente: one(clientes, { fields: [vendasMaterial.clienteId], references: [clientes.id] }),
+  material: one(materiais, { fields: [vendasMaterial.materialId], references: [materiais.id] }),
+}));
