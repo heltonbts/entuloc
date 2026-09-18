@@ -22,38 +22,38 @@ describe('ehDiaUtil', () => {
 });
 
 describe('calcularVencimento', () => {
-  it('entrega na segunda com 5 dias uteis vence na sexta', () => {
-    expect(calcularVencimento(SEGUNDA, 5, 'uteis')).toBe('2026-09-18');
+  it('entrega na segunda com 5 dias uteis vence na segunda seguinte', () => {
+    // O dia da entrega nao conta: ter(1) qua(2) qui(3) sex(4) seg(5).
+    expect(calcularVencimento(SEGUNDA, 5, 'uteis')).toBe('2026-09-21');
   });
 
   it('pula o fim de semana', () => {
-    // Quinta 17 + 5 dias uteis: qui(1) sex(2) seg(3) ter(4) qua(5).
-    expect(calcularVencimento('2026-09-17', 5, 'uteis')).toBe('2026-09-23');
+    // Quinta 17: sex(1) seg(2) ter(3) qua(4) qui(5).
+    expect(calcularVencimento('2026-09-17', 5, 'uteis')).toBe('2026-09-24');
   });
 
   it('pula feriado no meio do prazo', () => {
-    // Quarta 16 vira feriado: seg(1) ter(2) qui(3) sex(4) seg(5).
-    expect(calcularVencimento(SEGUNDA, 5, 'uteis', ['2026-09-16'])).toBe('2026-09-21');
+    // Quarta 16 vira feriado: ter(1) qui(2) sex(3) seg(4) ter(5).
+    expect(calcularVencimento(SEGUNDA, 5, 'uteis', ['2026-09-16'])).toBe('2026-09-22');
   });
 
-  it('entrega em dia nao util so comeca a contar no proximo dia util', () => {
+  it('entrega no sabado so comeca a contar na segunda', () => {
     // Sabado 19: seg(1) ter(2) qua(3) qui(4) sex(5).
     expect(calcularVencimento('2026-09-19', 5, 'uteis')).toBe('2026-09-25');
   });
 
   it('em dias corridos nao pula nada', () => {
-    // O dia da entrega conta, entao 5 corridos a partir de seg 14 vence sex 18.
-    expect(calcularVencimento(SEGUNDA, 5, 'corridos')).toBe('2026-09-18');
+    expect(calcularVencimento(SEGUNDA, 5, 'corridos')).toBe('2026-09-19');
   });
 
-  it('prazo de 1 dia vence no proprio dia da entrega', () => {
-    expect(calcularVencimento(SEGUNDA, 1, 'corridos')).toBe(SEGUNDA);
-    expect(calcularVencimento(SEGUNDA, 1, 'uteis')).toBe(SEGUNDA);
+  it('prazo de 1 dia vence no dia seguinte a entrega', () => {
+    expect(calcularVencimento(SEGUNDA, 1, 'corridos')).toBe('2026-09-15');
+    expect(calcularVencimento(SEGUNDA, 1, 'uteis')).toBe('2026-09-15');
   });
 
   it('nao desloca por causa do fuso do Brasil', () => {
-    expect(calcularVencimento('2026-01-01', 2, 'corridos')).toBe('2026-01-02');
-    expect(calcularVencimento('2026-12-31', 2, 'corridos')).toBe('2027-01-01');
+    expect(calcularVencimento('2026-01-01', 1, 'corridos')).toBe('2026-01-02');
+    expect(calcularVencimento('2026-12-31', 1, 'corridos')).toBe('2027-01-01');
   });
 
   it('rejeita prazo invalido', () => {

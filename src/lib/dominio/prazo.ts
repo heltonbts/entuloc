@@ -7,10 +7,9 @@ import type { ContagemPrazo, DataISO } from './tipos';
  * usar `new Date()` local no fuso do Brasil desloca o dia em operacoes de
  * data-sem-hora e faria o vencimento cair um dia antes.
  *
- * REGRA DE CONTAGEM: o dia da entrega conta como dia 1. Uma caçamba entregue
- * na segunda com 5 dias uteis vence na sexta da mesma semana. Se a entrega
- * cair em dia nao util (locacao em dias uteis), a contagem so comeca no
- * proximo dia util.
+ * REGRA DE CONTAGEM: o dia da entrega NAO conta. A contagem comeca no dia
+ * seguinte, entao uma caçamba entregue na segunda com 5 dias uteis vence na
+ * segunda seguinte.
  */
 
 const MS_DIA = 86_400_000;
@@ -47,11 +46,11 @@ export function calcularVencimento(
   }
 
   if (contagem === 'corridos') {
-    return formatarData(somarDias(parseData(entregaEm), dias - 1));
+    return formatarData(somarDias(parseData(entregaEm), dias));
   }
 
   let cursor = parseData(entregaEm);
-  let contados = ehDiaUtil(formatarData(cursor), feriados) ? 1 : 0;
+  let contados = 0;
   while (contados < dias) {
     cursor = somarDias(cursor, 1);
     if (ehDiaUtil(formatarData(cursor), feriados)) contados += 1;

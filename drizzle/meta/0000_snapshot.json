@@ -1,0 +1,745 @@
+{
+  "id": "cdb11dc5-b1b2-4a2d-b6bb-0f3d499f2c37",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.cacambas": {
+      "name": "cacambas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "numeracao": {
+          "name": "numeracao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_id": {
+          "name": "tipo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_cacamba",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'disponivel'"
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cacambas_tipo_id_tipos_cacamba_id_fk": {
+          "name": "cacambas_tipo_id_tipos_cacamba_id_fk",
+          "tableFrom": "cacambas",
+          "tableTo": "tipos_cacamba",
+          "columnsFrom": ["tipo_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cacambas_numeracao_unique": {
+          "name": "cacambas_numeracao_unique",
+          "nullsNotDistinct": false,
+          "columns": ["numeracao"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cidades": {
+      "name": "cidades",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uf": {
+          "name": "uf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_frete": {
+          "name": "valor_frete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativa": {
+          "name": "ativa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cidades_nome_uf": {
+          "name": "cidades_nome_uf",
+          "nullsNotDistinct": false,
+          "columns": ["nome", "uf"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "cidades_uf_valida": {
+          "name": "cidades_uf_valida",
+          "value": "char_length(\"cidades\".\"uf\") = 2"
+        },
+        "cidades_frete_nao_negativo": {
+          "name": "cidades_frete_nao_negativo",
+          "value": "\"cidades\".\"valor_frete\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.clientes": {
+      "name": "clientes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_pessoa": {
+          "name": "tipo_pessoa",
+          "type": "tipo_pessoa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'fisica'"
+        },
+        "documento": {
+          "name": "documento",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefone": {
+          "name": "telefone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "clientes_documento_unique": {
+          "name": "clientes_documento_unique",
+          "nullsNotDistinct": false,
+          "columns": ["documento"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.feriados": {
+      "name": "feriados",
+      "schema": "",
+      "columns": {
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.locacoes": {
+      "name": "locacoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cacamba_id": {
+          "name": "cacamba_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cidade_id": {
+          "name": "cidade_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endereco_entrega": {
+          "name": "endereco_entrega",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_locacao",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'orcamento'"
+        },
+        "valor_locacao": {
+          "name": "valor_locacao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_frete": {
+          "name": "valor_frete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dias_contratados": {
+          "name": "dias_contratados",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contagem_prazo": {
+          "name": "contagem_prazo",
+          "type": "contagem_prazo",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regra_multa_id": {
+          "name": "regra_multa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entrega_em": {
+          "name": "entrega_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vencimento_em": {
+          "name": "vencimento_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retirada_solicitada_em": {
+          "name": "retirada_solicitada_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retirada_em": {
+          "name": "retirada_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "multa_apurada": {
+          "name": "multa_apurada",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_por_id": {
+          "name": "criado_por_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "locacoes_cliente_id_clientes_id_fk": {
+          "name": "locacoes_cliente_id_clientes_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "clientes",
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_cacamba_id_cacambas_id_fk": {
+          "name": "locacoes_cacamba_id_cacambas_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "cacambas",
+          "columnsFrom": ["cacamba_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_cidade_id_cidades_id_fk": {
+          "name": "locacoes_cidade_id_cidades_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "cidades",
+          "columnsFrom": ["cidade_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_regra_multa_id_regras_multa_id_fk": {
+          "name": "locacoes_regra_multa_id_regras_multa_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "regras_multa",
+          "columnsFrom": ["regra_multa_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_criado_por_id_usuarios_id_fk": {
+          "name": "locacoes_criado_por_id_usuarios_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "usuarios",
+          "columnsFrom": ["criado_por_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "locacoes_valores_nao_negativos": {
+          "name": "locacoes_valores_nao_negativos",
+          "value": "\"locacoes\".\"valor_locacao\" >= 0 AND \"locacoes\".\"valor_frete\" >= 0"
+        },
+        "locacoes_dias_positivo": {
+          "name": "locacoes_dias_positivo",
+          "value": "\"locacoes\".\"dias_contratados\" >= 1"
+        },
+        "locacoes_retirada_apos_entrega": {
+          "name": "locacoes_retirada_apos_entrega",
+          "value": "\"locacoes\".\"retirada_em\" IS NULL OR \"locacoes\".\"entrega_em\" IS NULL OR \"locacoes\".\"retirada_em\" >= \"locacoes\".\"entrega_em\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.regras_multa": {
+      "name": "regras_multa",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base": {
+          "name": "base",
+          "type": "base_multa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "percentual_bps": {
+          "name": "percentual_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valor_fixo": {
+          "name": "valor_fixo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cobranca": {
+          "name": "cobranca",
+          "type": "cobranca_multa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'por_dia'"
+        },
+        "dias_carencia": {
+          "name": "dias_carencia",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "teto_maximo": {
+          "name": "teto_maximo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativa": {
+          "name": "ativa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "regras_multa_base_coerente": {
+          "name": "regras_multa_base_coerente",
+          "value": "(\"regras_multa\".\"base\" = 'percentual' AND \"regras_multa\".\"percentual_bps\" IS NOT NULL AND \"regras_multa\".\"valor_fixo\" IS NULL)\n       OR (\"regras_multa\".\"base\" = 'valor_fixo' AND \"regras_multa\".\"valor_fixo\" IS NOT NULL AND \"regras_multa\".\"percentual_bps\" IS NULL)"
+        },
+        "regras_multa_carencia_nao_negativa": {
+          "name": "regras_multa_carencia_nao_negativa",
+          "value": "\"regras_multa\".\"dias_carencia\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tipos_cacamba": {
+      "name": "tipos_cacamba",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "volume_m3": {
+          "name": "volume_m3",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_locacao": {
+          "name": "valor_locacao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dias_inclusos": {
+          "name": "dias_inclusos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contagem_prazo": {
+          "name": "contagem_prazo",
+          "type": "contagem_prazo",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'uteis'"
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tipos_cacamba_valor_nao_negativo": {
+          "name": "tipos_cacamba_valor_nao_negativo",
+          "value": "\"tipos_cacamba\".\"valor_locacao\" >= 0"
+        },
+        "tipos_cacamba_dias_positivo": {
+          "name": "tipos_cacamba_dias_positivo",
+          "value": "\"tipos_cacamba\".\"dias_inclusos\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.usuarios": {
+      "name": "usuarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "papel": {
+          "name": "papel",
+          "type": "papel",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'funcionario'"
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usuarios_email_unique": {
+          "name": "usuarios_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.base_multa": {
+      "name": "base_multa",
+      "schema": "public",
+      "values": ["percentual", "valor_fixo"]
+    },
+    "public.cobranca_multa": {
+      "name": "cobranca_multa",
+      "schema": "public",
+      "values": ["unica", "por_dia"]
+    },
+    "public.contagem_prazo": {
+      "name": "contagem_prazo",
+      "schema": "public",
+      "values": ["uteis", "corridos"]
+    },
+    "public.papel": {
+      "name": "papel",
+      "schema": "public",
+      "values": ["gestor", "funcionario"]
+    },
+    "public.status_cacamba": {
+      "name": "status_cacamba",
+      "schema": "public",
+      "values": ["disponivel", "alugada", "aguardando_retirada", "manutencao", "inativa"]
+    },
+    "public.status_locacao": {
+      "name": "status_locacao",
+      "schema": "public",
+      "values": [
+        "orcamento",
+        "agendada",
+        "entregue",
+        "retirada_solicitada",
+        "concluida",
+        "cancelada"
+      ]
+    },
+    "public.tipo_pessoa": {
+      "name": "tipo_pessoa",
+      "schema": "public",
+      "values": ["fisica", "juridica"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
