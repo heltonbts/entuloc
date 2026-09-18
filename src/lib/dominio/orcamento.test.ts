@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcularFechamento, calcularMulta, calcularOrcamento, formatarBRL } from './orcamento';
+import { calcularFechamento, calcularMulta, calcularOrcamento } from './orcamento';
 import type { CidadeAtendida, RegraMulta, TipoCacamba } from './tipos';
 import { podeAcessar, TIPOS_CACAMBA_PADRAO } from './tipos';
 
@@ -116,12 +116,6 @@ describe('calcularFechamento', () => {
   it('sem regra de multa o total e o orcamento', () => {
     const orc = calcularOrcamento(cacamba4m3, cidade);
     expect(calcularFechamento(orc, 5).total).toBe(62_000);
-  });
-});
-
-describe('formatarBRL', () => {
-  it('formata centavos em real', () => {
-    expect(formatarBRL(50_000)).toMatch(/R\$\s?500,00/);
   });
 });
 

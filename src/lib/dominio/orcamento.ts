@@ -71,9 +71,3 @@ export function calcularFechamento(
     total: orcamento.valorLocacao + orcamento.valorFrete + multa,
   };
 }
-
-const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-export function formatarBRL(valor: Centavos): string {
-  return BRL.format(valor / 100);
-}
