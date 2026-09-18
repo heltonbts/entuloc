@@ -2,6 +2,7 @@ import { asc } from 'drizzle-orm';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { exigirPermissaoPagina } from '@/server/auth/guarda';
 import { cidades } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
 
@@ -14,6 +15,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Cidades e frete' };
 
 export default async function PaginaCidades() {
+  await exigirPermissaoPagina('cidades.editar');
+
   const lista = await getDb().select().from(cidades).orderBy(asc(cidades.uf), asc(cidades.nome));
 
   return (

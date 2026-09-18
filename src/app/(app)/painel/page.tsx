@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Painel' };
 
-export default async function PaginaPainel() {
+export default async function PaginaPainel({ searchParams }: PageProps<'/painel'>) {
+  const { acesso } = await searchParams;
   const db = getDb();
   const [frota, disponiveis, cidadesAtivas, regrasAtivas, tipos] = await Promise.all([
     db.select({ n: count() }).from(cacambas),
@@ -48,6 +49,15 @@ export default async function PaginaPainel() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-navy-700 text-2xl font-extrabold dark:text-white">Painel</h1>
+
+      {acesso === 'negado' && (
+        <p
+          role="alert"
+          className="rounded-md border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200"
+        >
+          Você não tem acesso a essa área. Fale com o gestor.
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {indicadores.map((ind) => (

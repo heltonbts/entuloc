@@ -2,6 +2,7 @@ import { desc } from 'drizzle-orm';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { exigirPermissaoPagina } from '@/server/auth/guarda';
 import { regrasMulta } from '@/db/schema';
 import { formatarBRL, formatarPercentual } from '@/lib/dinheiro';
 
@@ -14,6 +15,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Regras de multa' };
 
 export default async function PaginaMultas() {
+  await exigirPermissaoPagina('multas.editar');
+
   const regras = await getDb().select().from(regrasMulta).orderBy(desc(regrasMulta.criadoEm));
 
   return (

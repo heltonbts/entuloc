@@ -2,6 +2,7 @@ import { asc } from 'drizzle-orm';
 
 import { Cartao } from '@/components/ui';
 import { getDb } from '@/db';
+import { exigirPermissaoPagina } from '@/server/auth/guarda';
 import { tiposCacamba } from '@/db/schema';
 
 import { FormularioTipo } from './formulario';
@@ -13,6 +14,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Tipos de caçamba' };
 
 export default async function PaginaTipos() {
+  await exigirPermissaoPagina('precos.editar');
+
   const tipos = await getDb().select().from(tiposCacamba).orderBy(asc(tiposCacamba.volumeM3));
 
   return (

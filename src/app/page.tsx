@@ -43,7 +43,7 @@ export default function Home() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
           <Logo size="sm" />
           <Link
-            href="#"
+            href="/entrar"
             className="bg-brand-500 hover:bg-brand-400 focus-visible:outline-brand-600 text-navy-900 rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             Entrar
@@ -66,7 +66,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="#"
+                href="/entrar"
                 className="bg-brand-500 hover:bg-brand-400 focus-visible:outline-brand-600 text-navy-900 rounded-md px-5 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
               >
                 Acessar o painel

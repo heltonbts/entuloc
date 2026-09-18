@@ -9,3 +9,6 @@ pnpm-lock.yaml
 yarn.lock
 public
 *.min.*
+
+# gerado pelo drizzle-kit
+drizzle/meta

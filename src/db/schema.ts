@@ -162,10 +162,34 @@ export const usuarios = pgTable('usuarios', {
   id: uuid('id').primaryKey().defaultRandom(),
   nome: text('nome').notNull(),
   email: text('email').notNull().unique(),
+  /** scrypt: `salt:hash` em hex. Nunca guarda a senha em claro. */
+  senhaHash: text('senha_hash').notNull(),
   papel: papelEnum('papel').notNull().default('funcionario'),
   ativo: boolean('ativo').notNull().default(true),
+  /** Forca troca de senha no proximo acesso (usuario recem-criado). */
+  precisaTrocarSenha: boolean('precisa_trocar_senha').notNull().default(true),
+  /** Tentativas erradas seguidas — zera no acerto. */
+  tentativasFalhas: integer('tentativas_falhas').notNull().default(0),
+  /** Enquanto no futuro, o login e recusado mesmo com a senha certa. */
+  bloqueadoAte: timestamp('bloqueado_ate', { withTimezone: true }),
   criadoEm,
   atualizadoEm,
+});
+
+/**
+ * Sessoes no banco, nao JWT.
+ *
+ * Com JWT nao da para invalidar antes de expirar; aqui, desligar um
+ * funcionario e um DELETE e o acesso cai no proximo request.
+ */
+export const sessoes = pgTable('sessoes', {
+  /** SHA-256 do token que vai no cookie — o token cru nunca e persistido. */
+  id: text('id').primaryKey(),
+  usuarioId: uuid('usuario_id')
+    .notNull()
+    .references(() => usuarios.id, { onDelete: 'cascade' }),
+  expiraEm: timestamp('expira_em', { withTimezone: true }).notNull(),
+  criadoEm,
 });
 
 /* ------------------------------------------------------------------ *

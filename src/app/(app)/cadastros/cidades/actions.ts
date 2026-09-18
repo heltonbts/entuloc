@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { exigirPermissao } from '@/server/auth/guarda';
 import { cidades } from '@/db/schema';
 import { violou } from '@/server/erros';
 import { dinheiro, erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao';
@@ -20,6 +21,7 @@ const esquema = z.object({
 });
 
 export async function criarCidade(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('cidades.editar');
   const parsed = esquema.safeParse({
     nome: form.get('nome'),
     uf: form.get('uf'),
@@ -43,11 +45,13 @@ export async function criarCidade(_estado: EstadoForm, form: FormData): Promise<
 }
 
 export async function alternarCidade(id: string, ativa: boolean) {
+  await exigirPermissao('cidades.editar');
   await getDb().update(cidades).set({ ativa }).where(eq(cidades.id, id));
   revalidatePath('/cadastros/cidades');
 }
 
 export async function atualizarFrete(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('cidades.editar');
   const parsed = z
     .object({ id: z.uuid(), valorFrete: dinheiro })
     .safeParse({ id: form.get('id'), valorFrete: form.get('valorFrete') });

@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 
 import { Cartao, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { exigirPermissaoPagina } from '@/server/auth/guarda';
 import { cacambas, tiposCacamba } from '@/db/schema';
 
 import { FormularioCacamba, SeletorStatus } from './formulario';
@@ -13,6 +14,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Frota' };
 
 export default async function PaginaFrota() {
+  await exigirPermissaoPagina('frota.editar');
+
   const db = getDb();
   const [tipos, frota] = await Promise.all([
     db

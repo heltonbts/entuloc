@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { exigirPermissao } from '@/server/auth/guarda';
 import { cacambas } from '@/db/schema';
 import { violou } from '@/server/erros';
 import { erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao';
@@ -16,6 +17,7 @@ const esquema = z.object({
 });
 
 export async function criarCacamba(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('frota.editar');
   const parsed = esquema.safeParse({
     numeracao: form.get('numeracao'),
     tipoId: form.get('tipoId'),
@@ -46,6 +48,7 @@ const statusValidos = [
 ] as const;
 
 export async function mudarStatus(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('frota.editar');
   const parsed = z
     .object({ id: z.uuid(), status: z.enum(statusValidos) })
     .safeParse({ id: form.get('id'), status: form.get('status') });

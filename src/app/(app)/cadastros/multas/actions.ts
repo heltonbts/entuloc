@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { exigirPermissao } from '@/server/auth/guarda';
 import { regrasMulta } from '@/db/schema';
 import {
   dinheiro,
@@ -33,6 +34,7 @@ const esquema = z.discriminatedUnion('base', [
 ]);
 
 export async function criarRegraMulta(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('multas.editar');
   const base = form.get('base');
   const parsed = esquema.safeParse({
     nome: form.get('nome'),
@@ -68,6 +70,7 @@ export async function criarRegraMulta(_estado: EstadoForm, form: FormData): Prom
 }
 
 export async function alternarRegra(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('multas.editar');
   const parsed = z
     .object({ id: z.uuid(), ativa: z.enum(['true', 'false']) })
     .safeParse({ id: form.get('id'), ativa: form.get('ativa') });

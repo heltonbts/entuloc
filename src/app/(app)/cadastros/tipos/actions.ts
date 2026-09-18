@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { exigirPermissao } from '@/server/auth/guarda';
 import { tiposCacamba } from '@/db/schema';
 import { dinheiro, erroDeZod, inteiroPositivo, type EstadoForm } from '@/server/validacao';
 
@@ -16,6 +17,7 @@ const esquema = z.object({
 });
 
 export async function salvarTipo(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('precos.editar');
   const parsed = esquema.safeParse({
     id: form.get('id'),
     valorLocacao: form.get('valorLocacao'),

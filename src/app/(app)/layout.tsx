@@ -1,28 +1,54 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { Logo } from '@/components/brand/logo';
+import { podeAcessar, type Permissao } from '@/lib/dominio/tipos';
+import { sair } from '@/server/auth/actions';
+import { exigirSessao } from '@/server/auth/guarda';
 
-const navegacao = [
+const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
   { href: '/painel', rotulo: 'Painel' },
-  { href: '/cadastros/tipos', rotulo: 'Tipos de caçamba' },
-  { href: '/cadastros/frota', rotulo: 'Frota' },
-  { href: '/cadastros/cidades', rotulo: 'Cidades e frete' },
-  { href: '/cadastros/multas', rotulo: 'Regras de multa' },
+  { href: '/cadastros/tipos', rotulo: 'Tipos de caçamba', exige: 'precos.editar' },
+  { href: '/cadastros/frota', rotulo: 'Frota', exige: 'frota.editar' },
+  { href: '/cadastros/cidades', rotulo: 'Cidades e frete', exige: 'cidades.editar' },
+  { href: '/cadastros/multas', rotulo: 'Regras de multa', exige: 'multas.editar' },
 ];
 
-export default function LayoutApp({ children }: LayoutProps<'/'>) {
+export default async function LayoutApp({ children }: LayoutProps<'/'>) {
+  const usuario = await exigirSessao();
+
+  // Quem ainda nao definiu senha propria nao circula pelo sistema.
+  if (usuario.precisaTrocarSenha) redirect('/trocar-senha');
+
+  const itens = navegacao.filter((i) => !i.exige || podeAcessar(usuario.papel, i.exige));
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="border-border-subtle bg-surface sticky top-0 z-10 border-b">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-6">
           <Link href="/painel" className="focus-visible:outline-brand-600 rounded">
             <Logo size="sm" />
           </Link>
-          <span className="text-navy-400 text-xs">Gestor</span>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-right sm:block">
+              <span className="text-navy-700 block text-sm font-medium dark:text-white">
+                {usuario.nome}
+              </span>
+              <span className="text-navy-400 block text-xs capitalize">{usuario.papel}</span>
+            </span>
+            <form action={sair}>
+              <button
+                type="submit"
+                className="text-navy-500 hover:text-brand-600 dark:text-navy-200 focus-visible:outline-brand-600 rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2"
+              >
+                Sair
+              </button>
+            </form>
+          </div>
         </div>
         <nav className="border-border-subtle border-t">
           <ul className="text-navy-500 dark:text-navy-200 mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 text-sm">
-            {navegacao.map((item) => (
+            {itens.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
