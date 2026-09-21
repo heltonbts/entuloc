@@ -47,6 +47,8 @@ export const statusLocacaoEnum = pgEnum('status_locacao', [
 ]);
 export const papelEnum = pgEnum('papel', ['gestor', 'funcionario']);
 export const tipoPessoaEnum = pgEnum('tipo_pessoa', ['fisica', 'juridica']);
+export const formaCobrancaEnum = pgEnum('forma_cobranca', ['entrega', 'retirada', 'periodo']);
+export const periodoFaturaEnum = pgEnum('periodo_fatura', ['semanal', 'quinzenal', 'mensal']);
 export const destinoEntulhoEnum = pgEnum('destino_entulho', ['deposito', 'venda']);
 export const etapaCampoEnum = pgEnum('etapa_campo', ['entrega', 'retirada', 'baixa']);
 
@@ -150,23 +152,41 @@ export const regrasMulta = pgTable(
  * Clientes e usuarios
  * ------------------------------------------------------------------ */
 
-export const clientes = pgTable('clientes', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  nome: text('nome').notNull(),
-  tipoPessoa: tipoPessoaEnum('tipo_pessoa').notNull().default('fisica'),
-  /** So identifica o perfil do cliente — nao limita quantas cacambas ele aluga. */
-  construtora: boolean('construtora').notNull().default(false),
-  /** Endereco de cadastro (rua, numero, bairro). E o padrao de entrega da cacamba. */
-  endereco: text('endereco').notNull(),
-  cidade: text('cidade').notNull(),
-  uf: text('uf').notNull(),
-  /** CPF ou CNPJ, somente digitos. */
-  documento: text('documento').unique(),
-  telefone: text('telefone'),
-  email: text('email'),
-  criadoEm,
-  atualizadoEm,
-});
+export const clientes = pgTable(
+  'clientes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nome: text('nome').notNull(),
+    tipoPessoa: tipoPessoaEnum('tipo_pessoa').notNull().default('fisica'),
+    /** So identifica o perfil do cliente — nao limita quantas cacambas ele aluga. */
+    construtora: boolean('construtora').notNull().default(false),
+    /** Endereco de cadastro (rua, numero, bairro). E o padrao de entrega da cacamba. */
+    endereco: text('endereco').notNull(),
+    cidade: text('cidade').notNull(),
+    uf: text('uf').notNull(),
+    /** CPF ou CNPJ, somente digitos. */
+    documento: text('documento').unique(),
+    telefone: text('telefone'),
+    email: text('email'),
+    /**
+     * Quando a locacao vira cobranca: na entrega (locacao + frete; extras na
+     * retirada), na retirada (tudo junto) ou numa fatura por periodo.
+     */
+    formaCobranca: formaCobrancaEnum('forma_cobranca').notNull().default('retirada'),
+    periodoFatura: periodoFaturaEnum('periodo_fatura'),
+    /** Dias para pagar depois do fechamento da fatura. */
+    prazoPagamentoDias: integer('prazo_pagamento_dias').notNull().default(0),
+    criadoEm,
+    atualizadoEm,
+  },
+  (t) => [
+    check(
+      'clientes_periodo_coerente',
+      sql`(${t.formaCobranca} = 'periodo') = (${t.periodoFatura} IS NOT NULL)`,
+    ),
+    check('clientes_prazo_nao_negativo', sql`${t.prazoPagamentoDias} >= 0`),
+  ],
+);
 
 export const usuarios = pgTable('usuarios', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -383,7 +403,11 @@ export const formaPagamentoEnum = pgEnum('forma_pagamento', [
   'cartao',
   'transferencia',
 ]);
-export const origemCobrancaEnum = pgEnum('origem_cobranca', ['locacao', 'venda_material']);
+export const origemCobrancaEnum = pgEnum('origem_cobranca', [
+  'locacao',
+  'venda_material',
+  'fatura',
+]);
 
 /** Materiais reciclados que a EntuLoc revende. */
 export const materiais = pgTable(
@@ -416,6 +440,10 @@ export const vendasMaterial = pgTable(
     precoUnitario: integer('preco_unitario').notNull(),
     valorTotal: integer('valor_total').notNull(),
     vendidaEm: date('vendida_em').notNull(),
+    /** Venda do entulho de uma cacamba feita pelo motorista na baixa. */
+    locacaoId: uuid('locacao_id')
+      .unique()
+      .references(() => locacoes.id, { onDelete: 'restrict' }),
     registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
       onDelete: 'set null',
     }),
@@ -453,14 +481,37 @@ export const cobrancas = pgTable(
   },
   (t) => [
     check('cobrancas_valor_positivo', sql`${t.valorTotal} > 0`),
-    // Uma cobranca aponta para a locacao OU para a venda que a originou —
-    // nunca as duas, nunca nenhuma.
+    // Uma cobranca aponta para a locacao OU para a venda que a originou; a
+    // fatura nao aponta para nenhuma — os itens dela ficam em itens_fatura.
+    // `::text`: o Postgres nao deixa usar um valor de enum na mesma transacao
+    // que o criou, e 'fatura' nasce na mesma migration desta regra.
     check(
       'cobrancas_origem_coerente',
-      sql`(${t.origem} = 'locacao' AND ${t.locacaoId} IS NOT NULL AND ${t.vendaId} IS NULL)
-       OR (${t.origem} = 'venda_material' AND ${t.vendaId} IS NOT NULL AND ${t.locacaoId} IS NULL)`,
+      sql`(${t.origem}::text = 'locacao' AND ${t.locacaoId} IS NOT NULL AND ${t.vendaId} IS NULL)
+       OR (${t.origem}::text = 'venda_material' AND ${t.vendaId} IS NOT NULL AND ${t.locacaoId} IS NULL)
+       OR (${t.origem}::text = 'fatura' AND ${t.locacaoId} IS NULL AND ${t.vendaId} IS NULL)`,
     ),
   ],
+);
+
+/**
+ * Locacoes cobradas numa fatura periodica. `locacao_id` unico: uma locacao
+ * entra em uma fatura so — gerar de novo nao cobra duas vezes.
+ */
+export const itensFatura = pgTable(
+  'itens_fatura',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    cobrancaId: uuid('cobranca_id')
+      .notNull()
+      .references(() => cobrancas.id, { onDelete: 'cascade' }),
+    locacaoId: uuid('locacao_id')
+      .notNull()
+      .unique()
+      .references(() => locacoes.id, { onDelete: 'restrict' }),
+    valor: integer('valor').notNull(), // centavos
+  },
+  (t) => [check('itens_fatura_valor_positivo', sql`${t.valor} > 0`)],
 );
 
 export const recebimentos = pgTable(

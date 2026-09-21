@@ -3,11 +3,13 @@
 import { useActionState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
+import { hojeEmSaoPaulo } from '@/lib/dominio/locacao';
 import type { EstadoForm } from '@/server/validacao';
 
-import { criarMaterial, registrarRecebimento, registrarVenda } from './actions';
+import { criarMaterial, gerarFatura, registrarRecebimento, registrarVenda } from './actions';
 
-const hoje = () => new Date().toISOString().slice(0, 10);
+// No fuso da operacao: toISOString() e UTC e, a noite, ja seria o dia seguinte.
+const hoje = () => hojeEmSaoPaulo();
 
 export function FormularioRecebimento({ cobrancaId }: { cobrancaId: string }) {
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(registrarRecebimento, {});
@@ -91,10 +93,17 @@ type Opcao = { id: string; rotulo: string };
 export function FormularioVenda({
   clientes,
   materiais,
+  locacaoId,
+  vendidaEm,
 }: {
   clientes: Opcao[];
   materiais: Opcao[];
+  /** Venda do entulho de uma OS (lancada a partir da baixa do motorista). */
+  locacaoId?: string;
+  vendidaEm?: string;
 }) {
+  // Varios formularios de venda na mesma pagina: ids unicos por formulario.
+  const p = locacaoId ? `${locacaoId}-` : '';
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(registrarVenda, {});
 
   if (clientes.length === 0 || materiais.length === 0) {
@@ -107,15 +116,16 @@ export function FormularioVenda({
 
   return (
     <form action={acao} className="flex flex-col gap-4">
+      {locacaoId && <input type="hidden" name="locacaoId" value={locacaoId} />}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select label="Cliente" name="clienteId">
+        <Select label={locacaoId ? 'Comprador' : 'Cliente'} name="clienteId" id={`${p}clienteId`}>
           {clientes.map((o) => (
             <option key={o.id} value={o.id}>
               {o.rotulo}
             </option>
           ))}
         </Select>
-        <Select label="Material" name="materialId">
+        <Select label="Material" name="materialId" id={`${p}materialId`}>
           {materiais.map((o) => (
             <option key={o.id} value={o.id}>
               {o.rotulo}
@@ -127,15 +137,23 @@ export function FormularioVenda({
         <Campo
           label="Quantidade"
           name="quantidade"
+          id={`${p}quantidade`}
           inputMode="decimal"
           placeholder="2,750"
           dica="Até 3 casas decimais"
           erro={estado.campos?.quantidade}
         />
-        <Campo label="Data da venda" name="vendidaEm" type="date" defaultValue={hoje()} />
+        <Campo
+          label="Data da venda"
+          name="vendidaEm"
+          id={`${p}vendidaEm`}
+          type="date"
+          defaultValue={vendidaEm ?? hoje()}
+        />
         <Campo
           label="Prazo para pagar"
           name="prazoDias"
+          id={`${p}prazoDias`}
           type="number"
           min={0}
           max={180}
@@ -145,12 +163,26 @@ export function FormularioVenda({
       </div>
       <div className="flex items-center gap-3">
         <Botao type="submit" disabled={enviando}>
-          {enviando ? 'Registrando…' : 'Registrar venda'}
+          {enviando ? 'Registrando…' : locacaoId ? 'Lançar venda do entulho' : 'Registrar venda'}
         </Botao>
         {estado.erro && (
           <span className="text-sm text-red-600 dark:text-red-400">{estado.erro}</span>
         )}
       </div>
+    </form>
+  );
+}
+
+export function GerarFatura({ chave }: { chave: string }) {
+  const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(gerarFatura, {});
+
+  return (
+    <form action={acao} className="flex flex-col gap-1">
+      <input type="hidden" name="chave" value={chave} />
+      <Botao type="submit" disabled={enviando} className="px-3 py-1 text-xs whitespace-nowrap">
+        {enviando ? 'Gerando…' : 'Gerar fatura'}
+      </Botao>
+      {estado.erro && <span className="text-xs text-red-600 dark:text-red-400">{estado.erro}</span>}
     </form>
   );
 }

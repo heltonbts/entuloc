@@ -6,7 +6,11 @@ import { hojeEmSaoPaulo, momentoDoRegistro } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
 import type { UsuarioSessao } from '@/server/auth/sessao';
 import { violou } from '@/server/erros';
-import { apurarFechamento, comandosFechamento } from '@/server/fechamento';
+import {
+  apurarFechamento,
+  comandosCobrancaNaEntrega,
+  comandosFechamento,
+} from '@/server/fechamento';
 import { apagarFoto, salvarFoto } from '@/server/fotos';
 
 export type DadosRegistro = {
@@ -112,7 +116,7 @@ export async function registrarNoCampo(
         registradoPorId: usuario.id,
       });
 
-    const entregar = (l: Locacao) => [
+    const entregar = async (l: Locacao) => [
       db
         .update(locacoes)
         .set({
@@ -124,10 +128,12 @@ export async function registrarNoCampo(
         // Condicao de status no UPDATE: toque duplo nao entrega duas vezes.
         .where(and(eq(locacoes.id, l.id), eq(locacoes.status, 'agendada'))),
       db.update(cacambas).set({ status: 'alugada' }).where(eq(cacambas.id, l.cacambaId)),
+      // Cliente que paga na entrega: a cobranca nasce junto, na mesma transacao.
+      ...(await comandosCobrancaNaEntrega(l, dia)),
     ];
 
     if (dados.etapa === 'entrega') {
-      await db.batch([registro(locacao.id, 'entrega', principal), ...entregar(locacao)]);
+      await db.batch([registro(locacao.id, 'entrega', principal), ...(await entregar(locacao))]);
     } else if (dados.etapa === 'troca') {
       const fotoCheia = await salvarFoto(`${pasta}/troca-recolhida`, dados.fotoRetirada!);
       fotos.push(fotoCheia);
@@ -137,7 +143,7 @@ export async function registrarNoCampo(
       await db.batch([
         registro(locacao.id, 'entrega', principal),
         registro(antiga!.id, 'retirada', fotoCheia),
-        ...entregar(locacao),
+        ...(await entregar(locacao)),
         ...comandosFechamento(antiga!, dia, apurado),
       ]);
     } else if (dados.etapa === 'retirada') {

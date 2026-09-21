@@ -18,7 +18,11 @@ import {
 import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
 import { violou } from '@/server/erros';
-import { apurarFechamento, comandosFechamento } from '@/server/fechamento';
+import {
+  apurarFechamento,
+  comandosCobrancaNaEntrega,
+  comandosFechamento,
+} from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { dinheiro, erroDeZod, inteiroPositivo, type EstadoForm } from '@/server/validacao';
 
@@ -156,14 +160,18 @@ export async function registrarEntrega(_estado: EstadoForm, form: FormData): Pro
     locacao.contagemPrazo,
   );
 
-  await db
-    .update(locacoes)
-    .set({ status: 'entregue', entregaEm: parsed.data.entregaEm, vencimentoEm })
-    .where(eq(locacoes.id, locacao.id));
-  await db.update(cacambas).set({ status: 'alugada' }).where(eq(cacambas.id, locacao.cacambaId));
+  await db.batch([
+    db
+      .update(locacoes)
+      .set({ status: 'entregue', entregaEm: parsed.data.entregaEm, vencimentoEm })
+      .where(and(eq(locacoes.id, locacao.id), eq(locacoes.status, 'agendada'))),
+    db.update(cacambas).set({ status: 'alugada' }).where(eq(cacambas.id, locacao.cacambaId)),
+    ...(await comandosCobrancaNaEntrega(locacao, parsed.data.entregaEm)),
+  ]);
 
   revalidatePath('/locacoes');
   revalidatePath('/cadastros/frota');
+  revalidatePath('/financeiro');
   return { ok: true };
 }
 

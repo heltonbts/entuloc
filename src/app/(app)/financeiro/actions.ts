@@ -5,10 +5,19 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { cobrancas, materiais, recebimentos, vendasMaterial } from '@/db/schema';
+import {
+  cobrancas,
+  itensFatura,
+  locacoes,
+  materiais,
+  recebimentos,
+  vendasMaterial,
+} from '@/db/schema';
 import { totalDaVenda } from '@/lib/dominio/financeiro';
+import { hojeEmSaoPaulo } from '@/lib/dominio/locacao';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { violou } from '@/server/erros';
+import { faturasPendentes } from '@/server/faturas';
 import { dinheiro, erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao';
 
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
@@ -103,7 +112,7 @@ export async function criarMaterial(_estado: EstadoForm, form: FormData): Promis
     throw erro;
   }
 
-  revalidatePath('/financeiro/materiais');
+  revalidatePath('/financeiro');
   return { ok: true };
 }
 
@@ -119,6 +128,8 @@ export async function registrarVenda(_estado: EstadoForm, form: FormData): Promi
       quantidade: z.string().min(1, 'Informe a quantidade'),
       vendidaEm: dataISO,
       prazoDias: z.coerce.number().int().min(0).max(180),
+      /** Venda do entulho de uma cacamba, registrada pelo motorista na baixa. */
+      locacaoId: z.uuid().optional(),
     })
     .safeParse({
       clienteId: form.get('clienteId'),
@@ -126,6 +137,7 @@ export async function registrarVenda(_estado: EstadoForm, form: FormData): Promi
       quantidade: form.get('quantidade'),
       vendidaEm: form.get('vendidaEm'),
       prazoDias: form.get('prazoDias') || 0,
+      locacaoId: form.get('locacaoId') || undefined,
     });
   if (!parsed.success) return erroDeZod(parsed.error);
 
@@ -150,27 +162,93 @@ export async function registrarVenda(_estado: EstadoForm, form: FormData): Promi
   vencimento.setUTCDate(vencimento.getUTCDate() + parsed.data.prazoDias);
   const vencimentoEm = vencimento.toISOString().slice(0, 10);
 
-  const [venda] = await db
-    .insert(vendasMaterial)
-    .values({
-      clienteId: parsed.data.clienteId,
-      materialId: material.id,
-      quantidade: quantidade.toFixed(3),
-      precoUnitario: material.precoUnitario, // congelado
-      valorTotal,
-      vendidaEm: parsed.data.vendidaEm,
-      registradoPorId: usuario.id,
-    })
-    .returning({ id: vendasMaterial.id });
+  if (parsed.data.locacaoId) {
+    const [origem] = await db
+      .select({ destino: locacoes.destinoEntulho })
+      .from(locacoes)
+      .where(eq(locacoes.id, parsed.data.locacaoId))
+      .limit(1);
+    if (origem?.destino !== 'venda') {
+      return { ok: false, erro: 'Essa OS não teve venda de entulho registrada.' };
+    }
+  }
 
-  await db.insert(cobrancas).values({
-    clienteId: parsed.data.clienteId,
-    origem: 'venda_material',
-    vendaId: venda.id,
-    descricao: `Venda de ${quantidade.toFixed(3)} ${material.unidade === 'tonelada' ? 't' : 'm³'} de ${material.nome}`,
-    valorTotal,
-    vencimentoEm,
-  });
+  // Id gerado aqui para a venda e a cobranca irem juntas num batch (transacao):
+  // venda sem cobranca seria dinheiro que ninguem cobra.
+  const vendaId = crypto.randomUUID();
+  const descricao = `Venda de ${quantidade.toFixed(3)} ${material.unidade === 'tonelada' ? 't' : 'm³'} de ${material.nome}`;
+  try {
+    await db.batch([
+      db.insert(vendasMaterial).values({
+        id: vendaId,
+        clienteId: parsed.data.clienteId,
+        materialId: material.id,
+        quantidade: quantidade.toFixed(3),
+        precoUnitario: material.precoUnitario, // congelado
+        valorTotal,
+        vendidaEm: parsed.data.vendidaEm,
+        registradoPorId: usuario.id,
+        locacaoId: parsed.data.locacaoId ?? null,
+      }),
+      db.insert(cobrancas).values({
+        clienteId: parsed.data.clienteId,
+        origem: 'venda_material',
+        vendaId,
+        descricao,
+        valorTotal,
+        vencimentoEm,
+      }),
+    ]);
+  } catch (erro) {
+    if (violou(erro, 'vendas_material_locacao_id_unique')) {
+      return { ok: false, erro: 'A venda do entulho dessa OS já foi lançada.' };
+    }
+    throw erro;
+  }
+
+  revalidatePath('/financeiro');
+  return { ok: true };
+}
+
+/* ------------------------- Faturas ------------------------- */
+
+/**
+ * Fecha a fatura de um cliente num periodo encerrado. Recalcula tudo no
+ * servidor (a tela pode estar velha); a unicidade de itens_fatura.locacao_id
+ * garante que nenhuma locacao entra em duas faturas.
+ */
+export async function gerarFatura(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('financeiro.registrar');
+
+  const chave = z.string().min(1).safeParse(form.get('chave'));
+  if (!chave.success) return { ok: false, erro: 'Fatura inválida.' };
+
+  const grupo = (await faturasPendentes(hojeEmSaoPaulo())).find((g) => g.chave === chave.data);
+  if (!grupo) return { ok: false, erro: 'Nada a faturar nesse período (já foi faturado?).' };
+  if (!grupo.encerrado) return { ok: false, erro: 'O período ainda não terminou.' };
+
+  const db = getDb();
+  const cobrancaId = crypto.randomUUID();
+  try {
+    await db.batch([
+      db.insert(cobrancas).values({
+        id: cobrancaId,
+        clienteId: grupo.clienteId,
+        origem: 'fatura',
+        descricao: grupo.descricao,
+        valorTotal: grupo.total,
+        vencimentoEm: grupo.vencimentoEm,
+      }),
+      db
+        .insert(itensFatura)
+        .values(grupo.itens.map((i) => ({ cobrancaId, locacaoId: i.locacaoId, valor: i.valor }))),
+    ]);
+  } catch (erro) {
+    if (violou(erro, 'itens_fatura_locacao_id_unique')) {
+      return { ok: false, erro: 'Alguma locação desse período já foi faturada.' };
+    }
+    throw erro;
+  }
 
   revalidatePath('/financeiro');
   return { ok: true };

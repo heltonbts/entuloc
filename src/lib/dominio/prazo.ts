@@ -23,7 +23,7 @@ export function formatarData(data: Date): DataISO {
   return data.toISOString().slice(0, 10);
 }
 
-function somarDias(data: Date, dias: number): Date {
+export function somarDias(data: Date, dias: number): Date {
   return new Date(data.getTime() + dias * MS_DIA);
 }
 

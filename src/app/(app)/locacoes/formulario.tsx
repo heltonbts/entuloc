@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
 import { formatarBRL, formatarValor } from '@/lib/dinheiro';
-import { valorProrrogacaoSugerido } from '@/lib/dominio/locacao';
+import { hojeEmSaoPaulo, valorProrrogacaoSugerido } from '@/lib/dominio/locacao';
 import type { EstadoForm } from '@/server/validacao';
 
 import {
@@ -18,7 +18,8 @@ import {
   trocarMotorista,
 } from './actions';
 
-const hoje = () => new Date().toISOString().slice(0, 10);
+// No fuso da operacao: toISOString() e UTC e, a noite, ja seria o dia seguinte.
+const hoje = () => hojeEmSaoPaulo();
 
 type Opcao = { id: string; rotulo: string };
 
