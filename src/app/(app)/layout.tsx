@@ -7,6 +7,7 @@ import { sair } from '@/server/auth/actions';
 import { exigirSessao } from '@/server/auth/guarda';
 
 const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
+  { href: '/campo', rotulo: 'Minhas OS', exige: 'coletas.registrar' },
   { href: '/painel', rotulo: 'Painel' },
   { href: '/locacoes', rotulo: 'Locações', exige: 'locacoes.ver' },
   { href: '/clientes', rotulo: 'Clientes', exige: 'clientes.editar' },

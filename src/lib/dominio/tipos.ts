@@ -44,7 +44,7 @@ export const TIPOS_CACAMBA_PADRAO: readonly TipoCacamba[] = [
     volumeM3: 4,
     valorLocacao: 50_000, // R$ 500,00
     diasInclusos: 5,
-    contagemPrazo: 'uteis',
+    contagemPrazo: 'corridos',
     ativo: true,
   },
   {
@@ -53,7 +53,7 @@ export const TIPOS_CACAMBA_PADRAO: readonly TipoCacamba[] = [
     volumeM3: 1.5,
     valorLocacao: 0, // a definir pelo gestor
     diasInclusos: 5,
-    contagemPrazo: 'uteis',
+    contagemPrazo: 'corridos',
     ativo: true,
   },
 ] as const;

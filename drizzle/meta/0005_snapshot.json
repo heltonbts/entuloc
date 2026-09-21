@@ -1,0 +1,1381 @@
+{
+  "id": "6d71f07c-d9e7-409d-9f62-75e08203dc9d",
+  "prevId": "2c22adeb-7218-49f2-96cb-a953ce339bfa",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.cacambas": {
+      "name": "cacambas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "numeracao": {
+          "name": "numeracao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_id": {
+          "name": "tipo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_cacamba",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'disponivel'"
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cacambas_tipo_id_tipos_cacamba_id_fk": {
+          "name": "cacambas_tipo_id_tipos_cacamba_id_fk",
+          "tableFrom": "cacambas",
+          "tableTo": "tipos_cacamba",
+          "columnsFrom": [
+            "tipo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cacambas_numeracao_unique": {
+          "name": "cacambas_numeracao_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "numeracao"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cidades": {
+      "name": "cidades",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uf": {
+          "name": "uf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_frete": {
+          "name": "valor_frete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativa": {
+          "name": "ativa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cidades_nome_uf": {
+          "name": "cidades_nome_uf",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nome",
+            "uf"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "cidades_uf_valida": {
+          "name": "cidades_uf_valida",
+          "value": "char_length(\"cidades\".\"uf\") = 2"
+        },
+        "cidades_frete_nao_negativo": {
+          "name": "cidades_frete_nao_negativo",
+          "value": "\"cidades\".\"valor_frete\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.clientes": {
+      "name": "clientes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_pessoa": {
+          "name": "tipo_pessoa",
+          "type": "tipo_pessoa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'fisica'"
+        },
+        "construtora": {
+          "name": "construtora",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "endereco": {
+          "name": "endereco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cidade": {
+          "name": "cidade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uf": {
+          "name": "uf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documento": {
+          "name": "documento",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefone": {
+          "name": "telefone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "clientes_documento_unique": {
+          "name": "clientes_documento_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "documento"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cobrancas": {
+      "name": "cobrancas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origem": {
+          "name": "origem",
+          "type": "origem_cobranca",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "locacao_id": {
+          "name": "locacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venda_id": {
+          "name": "venda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_total": {
+          "name": "valor_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vencimento_em": {
+          "name": "vencimento_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cancelada": {
+          "name": "cancelada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cobrancas_cliente_id_clientes_id_fk": {
+          "name": "cobrancas_cliente_id_clientes_id_fk",
+          "tableFrom": "cobrancas",
+          "tableTo": "clientes",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cobrancas_locacao_id_locacoes_id_fk": {
+          "name": "cobrancas_locacao_id_locacoes_id_fk",
+          "tableFrom": "cobrancas",
+          "tableTo": "locacoes",
+          "columnsFrom": [
+            "locacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cobrancas_venda_id_vendas_material_id_fk": {
+          "name": "cobrancas_venda_id_vendas_material_id_fk",
+          "tableFrom": "cobrancas",
+          "tableTo": "vendas_material",
+          "columnsFrom": [
+            "venda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cobrancas_valor_positivo": {
+          "name": "cobrancas_valor_positivo",
+          "value": "\"cobrancas\".\"valor_total\" > 0"
+        },
+        "cobrancas_origem_coerente": {
+          "name": "cobrancas_origem_coerente",
+          "value": "(\"cobrancas\".\"origem\" = 'locacao' AND \"cobrancas\".\"locacao_id\" IS NOT NULL AND \"cobrancas\".\"venda_id\" IS NULL)\n       OR (\"cobrancas\".\"origem\" = 'venda_material' AND \"cobrancas\".\"venda_id\" IS NOT NULL AND \"cobrancas\".\"locacao_id\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feriados": {
+      "name": "feriados",
+      "schema": "",
+      "columns": {
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.locacoes": {
+      "name": "locacoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "numero_os": {
+          "name": "numero_os",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "locacoes_numero_os_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cacamba_id": {
+          "name": "cacamba_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cidade_id": {
+          "name": "cidade_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endereco_entrega": {
+          "name": "endereco_entrega",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_locacao",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'orcamento'"
+        },
+        "valor_locacao": {
+          "name": "valor_locacao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_frete": {
+          "name": "valor_frete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dias_contratados": {
+          "name": "dias_contratados",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contagem_prazo": {
+          "name": "contagem_prazo",
+          "type": "contagem_prazo",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regra_multa_id": {
+          "name": "regra_multa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entrega_em": {
+          "name": "entrega_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vencimento_em": {
+          "name": "vencimento_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retirada_solicitada_em": {
+          "name": "retirada_solicitada_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retirada_em": {
+          "name": "retirada_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "multa_apurada": {
+          "name": "multa_apurada",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_por_id": {
+          "name": "criado_por_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "locacoes_cliente_id_clientes_id_fk": {
+          "name": "locacoes_cliente_id_clientes_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "clientes",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_cacamba_id_cacambas_id_fk": {
+          "name": "locacoes_cacamba_id_cacambas_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "cacambas",
+          "columnsFrom": [
+            "cacamba_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_cidade_id_cidades_id_fk": {
+          "name": "locacoes_cidade_id_cidades_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "cidades",
+          "columnsFrom": [
+            "cidade_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_regra_multa_id_regras_multa_id_fk": {
+          "name": "locacoes_regra_multa_id_regras_multa_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "regras_multa",
+          "columnsFrom": [
+            "regra_multa_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "locacoes_criado_por_id_usuarios_id_fk": {
+          "name": "locacoes_criado_por_id_usuarios_id_fk",
+          "tableFrom": "locacoes",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "criado_por_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "locacoes_numero_os_unique": {
+          "name": "locacoes_numero_os_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "numero_os"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "locacoes_valores_nao_negativos": {
+          "name": "locacoes_valores_nao_negativos",
+          "value": "\"locacoes\".\"valor_locacao\" >= 0 AND \"locacoes\".\"valor_frete\" >= 0"
+        },
+        "locacoes_dias_positivo": {
+          "name": "locacoes_dias_positivo",
+          "value": "\"locacoes\".\"dias_contratados\" >= 1"
+        },
+        "locacoes_retirada_apos_entrega": {
+          "name": "locacoes_retirada_apos_entrega",
+          "value": "\"locacoes\".\"retirada_em\" IS NULL OR \"locacoes\".\"entrega_em\" IS NULL OR \"locacoes\".\"retirada_em\" >= \"locacoes\".\"entrega_em\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.materiais": {
+      "name": "materiais",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unidade": {
+          "name": "unidade",
+          "type": "unidade_material",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'tonelada'"
+        },
+        "preco_unitario": {
+          "name": "preco_unitario",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "materiais_nome_unique": {
+          "name": "materiais_nome_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nome"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "materiais_preco_nao_negativo": {
+          "name": "materiais_preco_nao_negativo",
+          "value": "\"materiais\".\"preco_unitario\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.recebimentos": {
+      "name": "recebimentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cobranca_id": {
+          "name": "cobranca_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor": {
+          "name": "valor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "forma": {
+          "name": "forma",
+          "type": "forma_pagamento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recebido_em": {
+          "name": "recebido_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registrado_por_id": {
+          "name": "registrado_por_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "recebimentos_cobranca_id_cobrancas_id_fk": {
+          "name": "recebimentos_cobranca_id_cobrancas_id_fk",
+          "tableFrom": "recebimentos",
+          "tableTo": "cobrancas",
+          "columnsFrom": [
+            "cobranca_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "recebimentos_registrado_por_id_usuarios_id_fk": {
+          "name": "recebimentos_registrado_por_id_usuarios_id_fk",
+          "tableFrom": "recebimentos",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "registrado_por_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "recebimentos_valor_positivo": {
+          "name": "recebimentos_valor_positivo",
+          "value": "\"recebimentos\".\"valor\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.regras_multa": {
+      "name": "regras_multa",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base": {
+          "name": "base",
+          "type": "base_multa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "percentual_bps": {
+          "name": "percentual_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valor_fixo": {
+          "name": "valor_fixo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cobranca": {
+          "name": "cobranca",
+          "type": "cobranca_multa",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'por_dia'"
+        },
+        "dias_carencia": {
+          "name": "dias_carencia",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "teto_maximo": {
+          "name": "teto_maximo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativa": {
+          "name": "ativa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "regras_multa_base_coerente": {
+          "name": "regras_multa_base_coerente",
+          "value": "(\"regras_multa\".\"base\" = 'percentual' AND \"regras_multa\".\"percentual_bps\" IS NOT NULL AND \"regras_multa\".\"valor_fixo\" IS NULL)\n       OR (\"regras_multa\".\"base\" = 'valor_fixo' AND \"regras_multa\".\"valor_fixo\" IS NOT NULL AND \"regras_multa\".\"percentual_bps\" IS NULL)"
+        },
+        "regras_multa_carencia_nao_negativa": {
+          "name": "regras_multa_carencia_nao_negativa",
+          "value": "\"regras_multa\".\"dias_carencia\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sessoes": {
+      "name": "sessoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expira_em": {
+          "name": "expira_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sessoes_usuario_id_usuarios_id_fk": {
+          "name": "sessoes_usuario_id_usuarios_id_fk",
+          "tableFrom": "sessoes",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tipos_cacamba": {
+      "name": "tipos_cacamba",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "volume_m3": {
+          "name": "volume_m3",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_locacao": {
+          "name": "valor_locacao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dias_inclusos": {
+          "name": "dias_inclusos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contagem_prazo": {
+          "name": "contagem_prazo",
+          "type": "contagem_prazo",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'corridos'"
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tipos_cacamba_valor_nao_negativo": {
+          "name": "tipos_cacamba_valor_nao_negativo",
+          "value": "\"tipos_cacamba\".\"valor_locacao\" >= 0"
+        },
+        "tipos_cacamba_dias_positivo": {
+          "name": "tipos_cacamba_dias_positivo",
+          "value": "\"tipos_cacamba\".\"dias_inclusos\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.usuarios": {
+      "name": "usuarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "senha_hash": {
+          "name": "senha_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "papel": {
+          "name": "papel",
+          "type": "papel",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'funcionario'"
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "precisa_trocar_senha": {
+          "name": "precisa_trocar_senha",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "tentativas_falhas": {
+          "name": "tentativas_falhas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "bloqueado_ate": {
+          "name": "bloqueado_ate",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usuarios_email_unique": {
+          "name": "usuarios_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vendas_material": {
+      "name": "vendas_material",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantidade": {
+          "name": "quantidade",
+          "type": "numeric(12, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "preco_unitario": {
+          "name": "preco_unitario",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_total": {
+          "name": "valor_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendida_em": {
+          "name": "vendida_em",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registrado_por_id": {
+          "name": "registrado_por_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "vendas_material_cliente_id_clientes_id_fk": {
+          "name": "vendas_material_cliente_id_clientes_id_fk",
+          "tableFrom": "vendas_material",
+          "tableTo": "clientes",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "vendas_material_material_id_materiais_id_fk": {
+          "name": "vendas_material_material_id_materiais_id_fk",
+          "tableFrom": "vendas_material",
+          "tableTo": "materiais",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "vendas_material_registrado_por_id_usuarios_id_fk": {
+          "name": "vendas_material_registrado_por_id_usuarios_id_fk",
+          "tableFrom": "vendas_material",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "registrado_por_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "vendas_quantidade_positiva": {
+          "name": "vendas_quantidade_positiva",
+          "value": "\"vendas_material\".\"quantidade\" > 0"
+        },
+        "vendas_valores_nao_negativos": {
+          "name": "vendas_valores_nao_negativos",
+          "value": "\"vendas_material\".\"preco_unitario\" >= 0 AND \"vendas_material\".\"valor_total\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.base_multa": {
+      "name": "base_multa",
+      "schema": "public",
+      "values": [
+        "percentual",
+        "valor_fixo"
+      ]
+    },
+    "public.cobranca_multa": {
+      "name": "cobranca_multa",
+      "schema": "public",
+      "values": [
+        "unica",
+        "por_dia"
+      ]
+    },
+    "public.contagem_prazo": {
+      "name": "contagem_prazo",
+      "schema": "public",
+      "values": [
+        "uteis",
+        "corridos"
+      ]
+    },
+    "public.forma_pagamento": {
+      "name": "forma_pagamento",
+      "schema": "public",
+      "values": [
+        "dinheiro",
+        "pix",
+        "boleto",
+        "cartao",
+        "transferencia"
+      ]
+    },
+    "public.origem_cobranca": {
+      "name": "origem_cobranca",
+      "schema": "public",
+      "values": [
+        "locacao",
+        "venda_material"
+      ]
+    },
+    "public.papel": {
+      "name": "papel",
+      "schema": "public",
+      "values": [
+        "gestor",
+        "funcionario"
+      ]
+    },
+    "public.status_cacamba": {
+      "name": "status_cacamba",
+      "schema": "public",
+      "values": [
+        "disponivel",
+        "alugada",
+        "aguardando_retirada",
+        "manutencao",
+        "inativa"
+      ]
+    },
+    "public.status_locacao": {
+      "name": "status_locacao",
+      "schema": "public",
+      "values": [
+        "orcamento",
+        "agendada",
+        "entregue",
+        "retirada_solicitada",
+        "concluida",
+        "cancelada"
+      ]
+    },
+    "public.tipo_pessoa": {
+      "name": "tipo_pessoa",
+      "schema": "public",
+      "values": [
+        "fisica",
+        "juridica"
+      ]
+    },
+    "public.unidade_material": {
+      "name": "unidade_material",
+      "schema": "public",
+      "values": [
+        "tonelada",
+        "metro_cubico"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

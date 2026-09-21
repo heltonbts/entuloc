@@ -153,6 +153,7 @@ const tonsEtiqueta = {
   sucesso: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   alerta: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200',
   marca: 'bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-200',
+  perigo: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
 } as const;
 
 export function Etiqueta({

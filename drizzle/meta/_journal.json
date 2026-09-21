@@ -22,6 +22,34 @@
       "when": 1789758885353,
       "tag": "0002_spooky_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789985744090,
+      "tag": "0003_clear_miek",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789986007155,
+      "tag": "0004_pink_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789986177520,
+      "tag": "0005_curvy_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789987557610,
+      "tag": "0006_aspiring_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

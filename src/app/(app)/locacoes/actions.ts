@@ -2,15 +2,15 @@
 
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { cacambas, cobrancas, locacoes, regrasMulta, tiposCacamba, cidades } from '@/db/schema';
-import { calcularMulta } from '@/lib/dominio/orcamento';
-import { calcularDiasAtraso, calcularVencimento } from '@/lib/dominio/prazo';
-import type { RegraMulta } from '@/lib/dominio/tipos';
+import { cacambas, cidades, clientes, locacoes, tiposCacamba, usuarios } from '@/db/schema';
+import { calcularVencimento } from '@/lib/dominio/prazo';
+import { apurarFechamento, comandosFechamento } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
-import { erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao';
+import { dinheiro, erroDeZod, type EstadoForm } from '@/server/validacao';
 
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
 
@@ -18,7 +18,11 @@ const esquemaCriar = z.object({
   clienteId: z.uuid('Escolha o cliente'),
   cacambaId: z.uuid('Escolha a caçamba'),
   cidadeId: z.uuid('Escolha a cidade'),
-  enderecoEntrega: textoObrigatorio('Endereço'),
+  /** Vazio = entrega no endereco do cadastro do cliente. */
+  enderecoEntrega: z.string().trim().optional(),
+  valorFrete: dinheiro,
+  observacoes: z.string().trim().optional(),
+  motoristaId: z.uuid('Escolha o motorista'),
   regraMultaId: z.string().optional(),
 });
 
@@ -29,12 +33,29 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
     clienteId: form.get('clienteId'),
     cacambaId: form.get('cacambaId'),
     cidadeId: form.get('cidadeId'),
-    enderecoEntrega: form.get('enderecoEntrega'),
+    enderecoEntrega: form.get('enderecoEntrega') || undefined,
+    valorFrete: form.get('valorFrete'),
+    observacoes: form.get('observacoes') || undefined,
+    motoristaId: form.get('motoristaId'),
     regraMultaId: form.get('regraMultaId') || undefined,
   });
   if (!parsed.success) return erroDeZod(parsed.error);
 
   const db = getDb();
+
+  const [cliente] = await db
+    .select({ endereco: clientes.endereco })
+    .from(clientes)
+    .where(eq(clientes.id, parsed.data.clienteId))
+    .limit(1);
+  if (!cliente) return { ok: false, erro: 'Cliente não encontrado.' };
+
+  const [motorista] = await db
+    .select({ ativo: usuarios.ativo })
+    .from(usuarios)
+    .where(eq(usuarios.id, parsed.data.motoristaId))
+    .limit(1);
+  if (!motorista?.ativo) return { ok: false, erro: 'Motorista inválido ou desativado.' };
 
   const [cacamba] = await db
     .select({ id: cacambas.id, status: cacambas.status, tipoId: cacambas.tipoId })
@@ -64,21 +85,29 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
   }
 
   // Valores congelados agora: reajuste futuro de tabela nao altera esta locacao.
-  await db.insert(locacoes).values({
-    clienteId: parsed.data.clienteId,
-    cacambaId: parsed.data.cacambaId,
-    cidadeId: parsed.data.cidadeId,
-    enderecoEntrega: parsed.data.enderecoEntrega,
-    status: 'agendada',
-    valorLocacao: tipo.valorLocacao,
-    valorFrete: cidade.valorFrete,
-    diasContratados: tipo.diasInclusos,
-    contagemPrazo: tipo.contagemPrazo,
-    regraMultaId: parsed.data.regraMultaId || null,
-  });
+  const [criada] = await db
+    .insert(locacoes)
+    .values({
+      clienteId: parsed.data.clienteId,
+      cacambaId: parsed.data.cacambaId,
+      cidadeId: parsed.data.cidadeId,
+      enderecoEntrega: parsed.data.enderecoEntrega || cliente.endereco,
+      status: 'agendada',
+      valorLocacao: tipo.valorLocacao,
+      // O frete da cidade vem preenchido no formulario, mas pode ser ajustado
+      // no lancamento (entrega mais longe, desconto combinado).
+      valorFrete: parsed.data.valorFrete,
+      diasContratados: tipo.diasInclusos,
+      contagemPrazo: tipo.contagemPrazo,
+      regraMultaId: parsed.data.regraMultaId || null,
+      observacoes: parsed.data.observacoes || null,
+    })
+    .returning({ id: locacoes.id });
 
   revalidatePath('/locacoes');
-  return { ok: true };
+  revalidatePath('/painel');
+  // Toda locacao sai com a Ordem de Servico: abre direto para imprimir.
+  redirect(`/os/${criada.id}`);
 }
 
 export async function registrarEntrega(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
@@ -147,10 +176,8 @@ export async function solicitarRetirada(_estado: EstadoForm, form: FormData): Pr
 }
 
 /**
- * Fecha a locacao: apura a multa e gera a conta a receber.
- *
- * O atraso e contado ate o PEDIDO de retirada, nao ate a coleta efetiva — a
- * demora do caminhao e responsabilidade da EntuLoc, nao do cliente.
+ * Fecha a locacao pelo escritorio (sem foto): apura a multa e gera a conta a
+ * receber. O caminho normal e o motorista registrar a retirada em /campo.
  */
 export async function concluirLocacao(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
   await exigirPermissao('locacoes.fechar');
@@ -175,57 +202,45 @@ export async function concluirLocacao(_estado: EstadoForm, form: FormData): Prom
     return { ok: false, erro: 'A retirada não pode ser anterior à entrega.' };
   }
 
-  const referencia = locacao.retiradaSolicitadaEm ?? parsed.data.retiradaEm;
-  const diasAtraso = calcularDiasAtraso(locacao.vencimentoEm, referencia, locacao.contagemPrazo);
-
-  let multa = 0;
-  if (locacao.regraMultaId && diasAtraso > 0) {
-    const [regraLinha] = await db
-      .select()
-      .from(regrasMulta)
-      .where(eq(regrasMulta.id, locacao.regraMultaId))
-      .limit(1);
-    if (regraLinha) {
-      const regra: RegraMulta = {
-        id: regraLinha.id,
-        nome: regraLinha.nome,
-        base: regraLinha.base,
-        percentualBps: regraLinha.percentualBps ?? undefined,
-        valorFixo: regraLinha.valorFixo ?? undefined,
-        cobranca: regraLinha.cobranca,
-        diasCarencia: regraLinha.diasCarencia,
-        tetoMaximo: regraLinha.tetoMaximo ?? undefined,
-        ativa: regraLinha.ativa,
-      };
-      multa = calcularMulta(regra, locacao.valorLocacao, diasAtraso);
-    }
-  }
-
-  const total = locacao.valorLocacao + locacao.valorFrete + multa;
+  const apurado = await apurarFechamento(locacao, parsed.data.retiradaEm);
 
   // batch, nao db.transaction(): o driver HTTP do Neon nao suporta transacao
   // interativa ("No transactions support in neon-http driver"). O batch roda
-  // tudo numa transacao unica no servidor, entao ou os tres passos valem ou
+  // tudo numa transacao unica no servidor, entao ou os passos valem ou
   // nenhum vale — fechar a locacao sem gerar a cobranca seria perder dinheiro.
   await db.batch([
-    db
-      .update(locacoes)
-      .set({ status: 'concluida', retiradaEm: parsed.data.retiradaEm, multaApurada: multa })
-      .where(eq(locacoes.id, locacao.id)),
+    ...comandosFechamento(locacao, parsed.data.retiradaEm, apurado),
     db.update(cacambas).set({ status: 'disponivel' }).where(eq(cacambas.id, locacao.cacambaId)),
-    db.insert(cobrancas).values({
-      clienteId: locacao.clienteId,
-      origem: 'locacao',
-      locacaoId: locacao.id,
-      descricao:
-        multa > 0 ? `Locação de caçamba (${diasAtraso} dia(s) de atraso)` : 'Locação de caçamba',
-      valorTotal: total,
-      vencimentoEm: parsed.data.retiradaEm,
-    }),
   ]);
 
   revalidatePath('/locacoes');
   revalidatePath('/financeiro');
   revalidatePath('/cadastros/frota');
   return { ok: true };
+}
+
+/** Passa a OS para outro motorista (ex.: folga, rota). */
+export async function trocarMotorista(form: FormData): Promise<void> {
+  await exigirPermissao('locacoes.criar');
+
+  const parsed = z
+    .object({ id: z.uuid(), motoristaId: z.uuid() })
+    .safeParse({ id: form.get('id'), motoristaId: form.get('motoristaId') });
+  if (!parsed.success) return;
+
+  const db = getDb();
+  const [motorista] = await db
+    .select({ ativo: usuarios.ativo })
+    .from(usuarios)
+    .where(eq(usuarios.id, parsed.data.motoristaId))
+    .limit(1);
+  if (!motorista?.ativo) return;
+
+  await db
+    .update(locacoes)
+    .set({ motoristaId: parsed.data.motoristaId, atualizadoEm: new Date() })
+    .where(eq(locacoes.id, parsed.data.id));
+
+  revalidatePath('/locacoes');
+  revalidatePath('/campo');
 }

@@ -45,6 +45,8 @@ export const statusLocacaoEnum = pgEnum('status_locacao', [
 ]);
 export const papelEnum = pgEnum('papel', ['gestor', 'funcionario']);
 export const tipoPessoaEnum = pgEnum('tipo_pessoa', ['fisica', 'juridica']);
+export const destinoEntulhoEnum = pgEnum('destino_entulho', ['deposito', 'venda']);
+export const etapaCampoEnum = pgEnum('etapa_campo', ['entrega', 'retirada', 'baixa']);
 
 const criadoEm = timestamp('criado_em', { withTimezone: true }).notNull().defaultNow();
 const atualizadoEm = timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow();
@@ -61,7 +63,7 @@ export const tiposCacamba = pgTable(
     volumeM3: numeric('volume_m3', { precision: 5, scale: 2 }).notNull(),
     valorLocacao: integer('valor_locacao').notNull(), // centavos
     diasInclusos: integer('dias_inclusos').notNull(),
-    contagemPrazo: contagemPrazoEnum('contagem_prazo').notNull().default('uteis'),
+    contagemPrazo: contagemPrazoEnum('contagem_prazo').notNull().default('corridos'),
     ativo: boolean('ativo').notNull().default(true),
     criadoEm,
     atualizadoEm,
@@ -150,6 +152,12 @@ export const clientes = pgTable('clientes', {
   id: uuid('id').primaryKey().defaultRandom(),
   nome: text('nome').notNull(),
   tipoPessoa: tipoPessoaEnum('tipo_pessoa').notNull().default('fisica'),
+  /** So identifica o perfil do cliente — nao limita quantas cacambas ele aluga. */
+  construtora: boolean('construtora').notNull().default(false),
+  /** Endereco de cadastro (rua, numero, bairro). E o padrao de entrega da cacamba. */
+  endereco: text('endereco').notNull(),
+  cidade: text('cidade').notNull(),
+  uf: text('uf').notNull(),
   /** CPF ou CNPJ, somente digitos. */
   documento: text('documento').unique(),
   telefone: text('telefone'),
@@ -209,6 +217,8 @@ export const locacoes = pgTable(
   'locacoes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    /** Numero da Ordem de Servico: sequencial, gerado pelo banco, nunca reaproveitado. */
+    numeroOs: integer('numero_os').generatedAlwaysAsIdentity().unique(),
     clienteId: uuid('cliente_id')
       .notNull()
       .references(() => clientes.id, { onDelete: 'restrict' }),
@@ -219,6 +229,12 @@ export const locacoes = pgTable(
       .notNull()
       .references(() => cidades.id, { onDelete: 'restrict' }),
     enderecoEntrega: text('endereco_entrega').notNull(),
+    /** Instrucoes para a equipe, impressas na OS (ponto de referencia, onde posicionar). */
+    observacoes: text('observacoes'),
+    /** Funcionario que recebe a OS no celular. */
+    motoristaId: uuid('motorista_id').references(() => usuarios.id, { onDelete: 'set null' }),
+    /** Baixa da cacamba recolhida: para onde foi o entulho. Nulo = baixa pendente. */
+    destinoEntulho: destinoEntulhoEnum('destino_entulho'),
     status: statusLocacaoEnum('status').notNull().default('orcamento'),
 
     // Valores congelados no fechamento: reajuste futuro de tabela nao pode
@@ -251,6 +267,35 @@ export const locacoes = pgTable(
       sql`${t.retiradaEm} IS NULL OR ${t.entregaEm} IS NULL OR ${t.retiradaEm} >= ${t.entregaEm}`,
     ),
   ],
+);
+
+/* ------------------------------------------------------------------ *
+ * Registros de campo (fotos do motorista)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Comprovante de cada etapa feita na rua. O horario e o do SERVIDOR no envio,
+ * nao o do celular — relogio de aparelho pode estar errado ou ser ajustado.
+ */
+export const registrosCampo = pgTable(
+  'registros_campo',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    locacaoId: uuid('locacao_id')
+      .notNull()
+      .references(() => locacoes.id, { onDelete: 'cascade' }),
+    etapa: etapaCampoEnum('etapa').notNull(),
+    /** Caminho da foto no Vercel Blob (privado). */
+    fotoPathname: text('foto_pathname').notNull(),
+    registradoEm: timestamp('registrado_em', { withTimezone: true }).notNull().defaultNow(),
+    /** GPS do celular, quando o motorista permite. */
+    latitude: numeric('latitude', { precision: 9, scale: 6 }),
+    longitude: numeric('longitude', { precision: 9, scale: 6 }),
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (t) => [unique('registros_campo_etapa_unica').on(t.locacaoId, t.etapa)],
 );
 
 /* ------------------------------------------------------------------ *

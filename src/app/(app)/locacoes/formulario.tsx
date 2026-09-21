@@ -1,29 +1,60 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
-import { formatarBRL } from '@/lib/dinheiro';
+import { formatarBRL, formatarValor } from '@/lib/dinheiro';
 import type { EstadoForm } from '@/server/validacao';
 
-import { concluirLocacao, criarLocacao, registrarEntrega, solicitarRetirada } from './actions';
+import {
+  concluirLocacao,
+  criarLocacao,
+  registrarEntrega,
+  solicitarRetirada,
+  trocarMotorista,
+} from './actions';
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 
 type Opcao = { id: string; rotulo: string };
+
+export type OpcaoCliente = Opcao & { endereco: string; cidade: string; uf: string };
+export type OpcaoCidade = Opcao & { nome: string; uf: string; frete: number };
+
+/** Compara nomes de cidade ignorando acento e maiusculas ("Sao Jose" = "São José"). */
+const normalizar = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+function cidadeDoCliente(cliente: OpcaoCliente | undefined, cidades: OpcaoCidade[]) {
+  if (!cliente) return undefined;
+  return cidades.find(
+    (c) => normalizar(c.nome) === normalizar(cliente.cidade) && c.uf === cliente.uf.toUpperCase(),
+  );
+}
 
 export function FormularioLocacao({
   clientes,
   cacambas,
   cidades,
   regras,
+  motoristas,
 }: {
-  clientes: Opcao[];
+  clientes: OpcaoCliente[];
   cacambas: Opcao[];
-  cidades: Opcao[];
+  cidades: OpcaoCidade[];
   regras: Opcao[];
+  motoristas: Opcao[];
 }) {
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(criarLocacao, {});
+
+  const inicial = cidadeDoCliente(clientes[0], cidades) ?? cidades[0];
+  const [clienteId, setClienteId] = useState(clientes[0]?.id ?? '');
+  const [cidadeId, setCidadeId] = useState(inicial?.id ?? '');
+  const [frete, setFrete] = useState(inicial ? formatarValor(inicial.frete) : '');
 
   if (cacambas.length === 0 || clientes.length === 0 || cidades.length === 0) {
     return (
@@ -34,10 +65,32 @@ export function FormularioLocacao({
     );
   }
 
+  const cliente = clientes.find((c) => c.id === clienteId);
+
+  function escolherCidade(id: string) {
+    setCidadeId(id);
+    const cidade = cidades.find((c) => c.id === id);
+    if (cidade) setFrete(formatarValor(cidade.frete));
+  }
+
+  function escolherCliente(id: string) {
+    setClienteId(id);
+    const cidade = cidadeDoCliente(
+      clientes.find((c) => c.id === id),
+      cidades,
+    );
+    if (cidade) escolherCidade(cidade.id);
+  }
+
   return (
     <form action={acao} className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Select label="Cliente" name="clienteId">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="Cliente"
+          name="clienteId"
+          value={clienteId}
+          onChange={(e) => escolherCliente(e.target.value)}
+        >
           {clientes.map((o) => (
             <option key={o.id} value={o.id}>
               {o.rotulo}
@@ -51,19 +104,36 @@ export function FormularioLocacao({
             </option>
           ))}
         </Select>
-        <Select label="Cidade" name="cidadeId">
+      </div>
+      <Campo
+        label="Endereço da caçamba"
+        name="enderecoEntrega"
+        placeholder={cliente?.endereco ?? 'Rua, número, bairro'}
+        dica="Deixe em branco para entregar no endereço do cadastro. Preencha só se for diferente."
+        erro={estado.campos?.enderecoEntrega}
+      />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Select
+          label="Cidade da entrega"
+          name="cidadeId"
+          value={cidadeId}
+          onChange={(e) => escolherCidade(e.target.value)}
+        >
           {cidades.map((o) => (
             <option key={o.id} value={o.id}>
               {o.rotulo}
             </option>
           ))}
         </Select>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
         <Campo
-          label="Endereço de entrega"
-          name="enderecoEntrega"
-          erro={estado.campos?.enderecoEntrega}
+          label="Frete"
+          name="valorFrete"
+          prefixo="R$"
+          inputMode="decimal"
+          value={frete}
+          onChange={(e) => setFrete(e.target.value)}
+          dica="Vem da tabela da cidade; ajuste se precisar."
+          erro={estado.campos?.valorFrete}
         />
         <Select label="Regra de multa" name="regraMultaId">
           <option value="">Sem multa</option>
@@ -74,9 +144,22 @@ export function FormularioLocacao({
           ))}
         </Select>
       </div>
+      <Select label="Motorista" name="motoristaId">
+        {motoristas.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.rotulo}
+          </option>
+        ))}
+      </Select>
+      <Campo
+        label="Observações para a equipe"
+        name="observacoes"
+        placeholder="opcional — ponto de referência, onde posicionar a caçamba"
+        dica="Sai impresso na Ordem de Serviço."
+      />
       <div className="flex items-center gap-3">
         <Botao type="submit" disabled={enviando}>
-          {enviando ? 'Abrindo…' : 'Abrir locação'}
+          {enviando ? 'Abrindo…' : 'Abrir locação e gerar OS'}
         </Botao>
         {estado.erro && (
           <span className="text-sm text-red-600 dark:text-red-400">{estado.erro}</span>
@@ -147,6 +230,37 @@ export function AcoesLocacao({
     return <span className="text-navy-400 text-xs">Aguardando fechamento pelo gestor</span>;
   }
   return <span className="text-navy-400 text-xs">—</span>;
+}
+
+export function TrocarMotorista({
+  id,
+  atual,
+  motoristas,
+}: {
+  id: string;
+  atual: string | null;
+  motoristas: Opcao[];
+}) {
+  return (
+    <form action={trocarMotorista}>
+      <input type="hidden" name="id" value={id} />
+      <select
+        name="motoristaId"
+        defaultValue={atual ?? ''}
+        aria-label="Motorista"
+        // Troca na hora: e so um campo, um botao "salvar" seria clique sobrando.
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        className="border-border-subtle bg-surface text-foreground max-w-36 rounded-md border px-2 py-1 text-xs"
+      >
+        {!atual && <option value="">— escolher —</option>}
+        {motoristas.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.rotulo}
+          </option>
+        ))}
+      </select>
+    </form>
+  );
 }
 
 export { formatarBRL };

@@ -1,5 +1,6 @@
 'use server';
 
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -13,6 +14,14 @@ import { violou } from '@/server/erros';
 const esquema = z.object({
   nome: textoObrigatorio('Nome'),
   tipoPessoa: z.enum(['fisica', 'juridica']),
+  construtora: z.boolean(),
+  endereco: textoObrigatorio('Endereço'),
+  cidade: textoObrigatorio('Cidade'),
+  uf: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2}$/, 'UF inválida'),
   documento: z
     .string()
     .trim()
@@ -34,6 +43,10 @@ export async function criarCliente(_estado: EstadoForm, form: FormData): Promise
   const parsed = esquema.safeParse({
     nome: form.get('nome'),
     tipoPessoa: form.get('tipoPessoa'),
+    construtora: form.get('construtora') === 'on',
+    endereco: form.get('endereco'),
+    cidade: form.get('cidade'),
+    uf: form.get('uf'),
     documento: form.get('documento') || undefined,
     telefone: form.get('telefone') || undefined,
     email: form.get('email') || undefined,
@@ -51,4 +64,21 @@ export async function criarCliente(_estado: EstadoForm, form: FormData): Promise
 
   revalidatePath('/clientes');
   return { ok: true };
+}
+
+export async function alternarConstrutora(form: FormData): Promise<void> {
+  await exigirPermissao('clientes.editar');
+
+  const parsed = z
+    .object({ id: z.uuid(), construtora: z.enum(['sim', 'nao']) })
+    .safeParse({ id: form.get('id'), construtora: form.get('construtora') });
+  if (!parsed.success) return;
+
+  await getDb()
+    .update(clientes)
+    .set({ construtora: parsed.data.construtora === 'sim', atualizadoEm: new Date() })
+    .where(eq(clientes.id, parsed.data.id));
+
+  revalidatePath('/clientes');
+  revalidatePath('/locacoes');
 }

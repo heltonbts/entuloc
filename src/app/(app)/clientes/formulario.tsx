@@ -36,6 +36,26 @@ export function FormularioCliente() {
           erro={estado.campos?.email}
         />
       </div>
+      <div className="grid gap-4 sm:grid-cols-[3fr_2fr_1fr]">
+        <Campo
+          label="Endereço"
+          name="endereco"
+          placeholder="Rua, número, bairro"
+          erro={estado.campos?.endereco}
+        />
+        <Campo label="Cidade" name="cidade" erro={estado.campos?.cidade} />
+        <Campo label="UF" name="uf" maxLength={2} placeholder="SP" erro={estado.campos?.uf} />
+      </div>
+      <label className="text-navy-700 dark:text-navy-100 flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="construtora"
+          className="accent-brand-600 mt-0.5 size-4 rounded"
+        />
+        <span>
+          <span className="block font-medium">É construtora</span>
+        </span>
+      </label>
       <div className="flex items-center gap-3">
         <Botao type="submit" disabled={enviando}>
           {enviando ? 'Salvando…' : 'Cadastrar cliente'}
