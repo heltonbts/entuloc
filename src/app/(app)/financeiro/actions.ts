@@ -13,10 +13,12 @@ import {
   recebimentos,
   vendasMaterial,
 } from '@/db/schema';
+import { formatarQuantidade, podeVender } from '@/lib/dominio/estoque';
 import { totalDaVenda } from '@/lib/dominio/financeiro';
 import { hojeEmSaoPaulo } from '@/lib/dominio/locacao';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { violou } from '@/server/erros';
+import { saldoDoMaterial } from '@/server/estoque';
 import { faturasPendentes } from '@/server/faturas';
 import { dinheiro, erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao';
 
@@ -158,6 +160,21 @@ export async function registrarVenda(_estado: EstadoForm, form: FormData): Promi
   }
   if (valorTotal <= 0) return { ok: false, erro: 'O valor da venda ficou zerado.' };
 
+  // Material do deposito so sai se ha estoque. Entulho vendido direto da
+  // cacamba (locacaoId) nunca entrou no deposito, entao nao passa por aqui.
+  if (!parsed.data.locacaoId) {
+    const saldo = await saldoDoMaterial(material.id);
+    const pedido = Math.round(quantidade * 1000);
+    if (!podeVender(saldo, pedido)) {
+      return {
+        ok: false,
+        campos: {
+          quantidade: `Estoque de ${material.nome}: ${formatarQuantidade(saldo, material.unidade)}. Registre a produção ou um ajuste no Depósito.`,
+        },
+      };
+    }
+  }
+
   const vencimento = new Date(`${parsed.data.vendidaEm}T00:00:00Z`);
   vencimento.setUTCDate(vencimento.getUTCDate() + parsed.data.prazoDias);
   const vencimentoEm = vencimento.toISOString().slice(0, 10);
@@ -207,6 +224,7 @@ export async function registrarVenda(_estado: EstadoForm, form: FormData): Promi
   }
 
   revalidatePath('/financeiro');
+  revalidatePath('/deposito');
   return { ok: true };
 }
 

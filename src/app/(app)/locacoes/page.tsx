@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { col } from '@/db/sql';
 import {
   cacambas,
   cidades,
@@ -57,7 +58,7 @@ export default async function PaginaLocacoes() {
           diasContratados: locacoes.diasContratados,
           freteCidade: cidades.valorFrete,
           prorrogado:
-            sql<number>`(select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${prorrogacoes.locacaoId} = ${locacoes.id})`.mapWith(
+            sql<number>`(select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
               Number,
             ),
           endereco: locacoes.enderecoEntrega,

@@ -514,6 +514,62 @@ export const itensFatura = pgTable(
   (t) => [check('itens_fatura_valor_positivo', sql`${t.valor} > 0`)],
 );
 
+/* ------------------------------------------------------------------ *
+ * Deposito e estoque
+ * ------------------------------------------------------------------ */
+
+export const tipoMovimentoEnum = pgEnum('tipo_movimento', [
+  'entrada_entulho',
+  'producao',
+  'consumo_entulho',
+  'ajuste',
+]);
+
+/**
+ * Livro do deposito. O estoque NAO fica guardado em coluna: e sempre a soma
+ * dos movimentos (menos as vendas), pelo mesmo motivo do saldo das cobrancas.
+ *
+ * `material_id` nulo = entulho bruto (em m³); preenchido = material reciclado
+ * (na unidade do material). Quantidade com sinal: entrada positiva, saida negativa.
+ */
+export const movimentosEstoque = pgTable(
+  'movimentos_estoque',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tipo: tipoMovimentoEnum('tipo').notNull(),
+    materialId: uuid('material_id').references(() => materiais.id, { onDelete: 'restrict' }),
+    quantidade: numeric('quantidade', { precision: 12, scale: 3 }).notNull(),
+    /** Entrada automatica da baixa no deposito: uma por cacamba recolhida. */
+    locacaoId: uuid('locacao_id')
+      .unique()
+      .references(() => locacoes.id, { onDelete: 'restrict' }),
+    /** Agrupa o par producao + consumo de entulho lancados juntos. */
+    loteId: uuid('lote_id'),
+    observacao: text('observacao'),
+    ocorridoEm: date('ocorrido_em').notNull(),
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+    criadoEm,
+  },
+  (t) => [
+    check('movimentos_quantidade_nao_zero', sql`${t.quantidade} <> 0`),
+    // Entulho bruto so entra, e consumido ou ajustado; material so e produzido ou ajustado.
+    check(
+      'movimentos_tipo_coerente',
+      sql`(${t.tipo} IN ('entrada_entulho', 'consumo_entulho') AND ${t.materialId} IS NULL)
+       OR (${t.tipo} = 'producao' AND ${t.materialId} IS NOT NULL)
+       OR ${t.tipo} = 'ajuste'`,
+    ),
+    check(
+      'movimentos_sinal_coerente',
+      sql`(${t.tipo} IN ('entrada_entulho', 'producao') AND ${t.quantidade} > 0)
+       OR (${t.tipo} = 'consumo_entulho' AND ${t.quantidade} < 0)
+       OR ${t.tipo} = 'ajuste'`,
+    ),
+  ],
+);
+
 export const recebimentos = pgTable(
   'recebimentos',
   {

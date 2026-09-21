@@ -71,6 +71,13 @@
       "when": 1789997513574,
       "tag": "0009_lonely_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790001136840,
+      "tag": "0010_absurd_rumiko_fujikawa",
+      "breakpoints": true
     }
   ]
 }

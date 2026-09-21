@@ -11,6 +11,7 @@ const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
   { href: '/painel', rotulo: 'Painel' },
   { href: '/locacoes', rotulo: 'Locações', exige: 'locacoes.ver' },
   { href: '/clientes', rotulo: 'Clientes', exige: 'clientes.editar' },
+  { href: '/deposito', rotulo: 'Depósito', exige: 'deposito.registrar' },
   { href: '/financeiro', rotulo: 'Financeiro', exige: 'financeiro.ver' },
   { href: '/relatorios', rotulo: 'Relatórios', exige: 'financeiro.ver' },
   { href: '/cadastros/tipos', rotulo: 'Tipos de caçamba', exige: 'precos.editar' },

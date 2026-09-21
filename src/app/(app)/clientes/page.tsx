@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { col } from '@/db/sql';
 import { clientes, cobrancas, locacoes, recebimentos } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
 import { formatarDocumento } from '@/lib/documento';
@@ -35,7 +36,7 @@ export default async function PaginaClientes() {
             clienteId: cobrancas.clienteId,
             saldo: sql<number>`coalesce(sum(greatest(0, ${cobrancas.valorTotal} - (
               select coalesce(sum(${recebimentos.valor}), 0) from ${recebimentos}
-              where ${recebimentos.cobrancaId} = ${cobrancas.id}))), 0)`.mapWith(Number),
+              where ${col(recebimentos.cobrancaId)} = ${col(cobrancas.id)}))), 0)`.mapWith(Number),
           })
           .from(cobrancas)
           .where(sql`not ${cobrancas.cancelada}`)

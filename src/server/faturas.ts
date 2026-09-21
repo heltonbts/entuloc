@@ -1,6 +1,7 @@
 import { and, eq, notExists, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
+import { col } from '@/db/sql';
 import { clientes, cobrancas, itensFatura, locacoes, prorrogacoes } from '@/db/schema';
 import {
   descreverFatura,
@@ -38,11 +39,11 @@ export async function faturasPendentes(hoje: DataISO): Promise<GrupoFatura[]> {
       retiradaEm: locacoes.retiradaEm,
       total:
         sql<number>`${locacoes.valorLocacao} + ${locacoes.valorFrete} + coalesce(${locacoes.multaApurada}, 0)
-        + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${prorrogacoes.locacaoId} = ${locacoes.id})`.mapWith(
+        + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
           Number,
         ),
       cobradoDireto: sql<number>`(select coalesce(sum(${cobrancas.valorTotal}), 0) from ${cobrancas}
-        where ${cobrancas.locacaoId} = ${locacoes.id} and not ${cobrancas.cancelada})`.mapWith(
+        where ${col(cobrancas.locacaoId)} = ${col(locacoes.id)} and not ${cobrancas.cancelada})`.mapWith(
         Number,
       ),
       clienteId: clientes.id,

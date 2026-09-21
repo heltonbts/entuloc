@@ -15,6 +15,7 @@ import Link from 'next/link';
 
 import { Cartao, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { col } from '@/db/sql';
 import { cacambas, clientes, cobrancas, locacoes, prorrogacoes, recebimentos } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
 import { periodoDaFatura } from '@/lib/dominio/faturamento';
@@ -151,11 +152,13 @@ export default async function PaginaRelatorios({ searchParams }: PageProps<'/rel
         nome: clientes.nome,
         saldo: sql<number>`sum(greatest(0, ${cobrancas.valorTotal} - (
           select coalesce(sum(${recebimentos.valor}), 0) from ${recebimentos}
-          where ${recebimentos.cobrancaId} = ${cobrancas.id})))`.mapWith(Number),
+          where ${col(recebimentos.cobrancaId)} = ${col(cobrancas.id)})))`.mapWith(Number),
         vencido:
           sql<number>`sum(case when ${cobrancas.vencimentoEm} < ${hoje} then greatest(0, ${cobrancas.valorTotal} - (
           select coalesce(sum(${recebimentos.valor}), 0) from ${recebimentos}
-          where ${recebimentos.cobrancaId} = ${cobrancas.id})) else 0 end)`.mapWith(Number),
+          where ${col(recebimentos.cobrancaId)} = ${col(cobrancas.id)})) else 0 end)`.mapWith(
+            Number,
+          ),
       })
       .from(cobrancas)
       .innerJoin(clientes, eq(cobrancas.clienteId, clientes.id))

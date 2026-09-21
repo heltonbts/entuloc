@@ -11,6 +11,7 @@ import {
   comandosCobrancaNaEntrega,
   comandosFechamento,
 } from '@/server/fechamento';
+import { comandoEntradaNaBaixa } from '@/server/estoque';
 import { apagarFoto, salvarFoto } from '@/server/fotos';
 
 export type DadosRegistro = {
@@ -161,6 +162,10 @@ export async function registrarNoCampo(
           .set({ destinoEntulho: dados.destino, atualizadoEm: new Date() })
           .where(eq(locacoes.id, locacao.id)),
         db.update(cacambas).set({ status: 'disponivel' }).where(eq(cacambas.id, locacao.cacambaId)),
+        // Descarregou no deposito: o entulho entra no estoque na mesma transacao.
+        ...(dados.destino === 'deposito'
+          ? await comandoEntradaNaBaixa(locacao, dia, usuario.id)
+          : []),
       ]);
     }
   } catch (erro) {

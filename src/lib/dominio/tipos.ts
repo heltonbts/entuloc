@@ -169,7 +169,8 @@ export type Permissao =
   | 'clientes.editar'
   | 'locacoes.criar'
   | 'locacoes.ver'
-  | 'coletas.registrar';
+  | 'coletas.registrar'
+  | 'deposito.registrar';
 
 /** O gestor configura e ve dinheiro; o funcionario toca a operacao do dia. */
 export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
@@ -189,6 +190,7 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'locacoes.criar',
     'locacoes.ver',
     'coletas.registrar',
+    'deposito.registrar',
   ],
   funcionario: [
     'vendas.registrar',
@@ -197,6 +199,7 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'locacoes.criar',
     'locacoes.ver',
     'coletas.registrar',
+    'deposito.registrar',
   ],
 } as const;
 

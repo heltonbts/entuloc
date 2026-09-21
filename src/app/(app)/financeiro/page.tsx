@@ -12,6 +12,7 @@ import {
   vendasMaterial,
 } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
+import { formatarQuantidade } from '@/lib/dominio/estoque';
 import {
   resumirCarteira,
   saldoDevedor,
@@ -21,6 +22,7 @@ import {
 } from '@/lib/dominio/financeiro';
 import { hojeEmSaoPaulo } from '@/lib/dominio/locacao';
 import { exigirPermissaoPagina } from '@/server/auth/guarda';
+import { saldosDoDeposito } from '@/server/estoque';
 import { faturasPendentes } from '@/server/faturas';
 
 import {
@@ -73,6 +75,7 @@ export default async function PaginaFinanceiro() {
     opcoesMaterial,
     listaMateriais,
     faturas,
+    deposito,
     vendasEntulho,
   ] = await Promise.all([
     db
@@ -105,6 +108,7 @@ export default async function PaginaFinanceiro() {
       .orderBy(asc(materiais.nome)),
     db.select().from(materiais).orderBy(desc(materiais.criadoEm)),
     faturasPendentes(hoje),
+    saldosDoDeposito(),
     // Motorista marcou "vendi o entulho" na baixa e ninguem lancou o valor ainda.
     db
       .select({
@@ -133,6 +137,8 @@ export default async function PaginaFinanceiro() {
       )
       .orderBy(asc(locacoes.numeroOs)),
   ]);
+
+  const estoque = new Map(deposito.materiais.map((m) => [m.id, m.saldo]));
 
   const porCobranca = new Map<string, { valor: number; recebidoEm: string }[]>();
   for (const r of linhasRecebimento) {
@@ -356,7 +362,7 @@ export default async function PaginaFinanceiro() {
           clientes={opcoesCliente}
           materiais={opcoesMaterial.map((m) => ({
             id: m.id,
-            rotulo: `${m.nome} — ${formatarBRL(m.preco)}/${m.unidade === 'tonelada' ? 't' : 'm³'}`,
+            rotulo: `${m.nome} — ${formatarBRL(m.preco)}/${m.unidade === 'tonelada' ? 't' : 'm³'} · estoque ${formatarQuantidade(estoque.get(m.id) ?? 0, m.unidade)}`,
           }))}
         />
       </Cartao>

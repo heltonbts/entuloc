@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
+import { col } from '@/db/sql';
 import { cacambas, clientes, cobrancas, locacoes, prorrogacoes, recebimentos } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
 import { formatarDocumento } from '@/lib/documento';
@@ -68,7 +69,7 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
         numeracao: cacambas.numeracao,
         total:
           sql<number>`${locacoes.valorLocacao} + ${locacoes.valorFrete} + coalesce(${locacoes.multaApurada}, 0)
-          + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${prorrogacoes.locacaoId} = ${locacoes.id})`.mapWith(
+          + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
             Number,
           ),
       })
@@ -86,7 +87,7 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
             cancelada: cobrancas.cancelada,
             recebido:
               sql<number>`(select coalesce(sum(${recebimentos.valor}), 0) from ${recebimentos}
-              where ${recebimentos.cobrancaId} = ${cobrancas.id})`.mapWith(Number),
+              where ${col(recebimentos.cobrancaId)} = ${col(cobrancas.id)})`.mapWith(Number),
           })
           .from(cobrancas)
           .where(eq(cobrancas.clienteId, id))
