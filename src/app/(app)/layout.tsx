@@ -16,6 +16,7 @@ const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
   { href: '/cadastros/frota', rotulo: 'Frota', exige: 'frota.editar' },
   { href: '/cadastros/cidades', rotulo: 'Cidades e frete', exige: 'cidades.editar' },
   { href: '/cadastros/multas', rotulo: 'Regras de multa', exige: 'multas.editar' },
+  { href: '/usuarios', rotulo: 'Usuários', exige: 'usuarios.gerenciar' },
 ];
 
 export default async function LayoutApp({ children }: LayoutProps<'/'>) {

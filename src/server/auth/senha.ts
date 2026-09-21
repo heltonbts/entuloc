@@ -66,3 +66,11 @@ export async function conferirSenha(senha: string, armazenado: string): Promise<
   // Comparacao em tempo constante: `===` vaza o tamanho do prefixo correto.
   return timingSafeEqual(derivada, esperado);
 }
+
+/**
+ * Senha provisoria sorteada: mostrada UMA vez para o gestor repassar e trocada
+ * pelo usuario no primeiro acesso. Sem `-`/`_` para ditar por telefone sem erro.
+ */
+export function senhaProvisoria(): string {
+  return randomBytes(12).toString('base64url').replace(/[-_]/g, 'x').slice(0, 14);
+}

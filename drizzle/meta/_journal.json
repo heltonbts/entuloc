@@ -50,6 +50,13 @@
       "when": 1789987557610,
       "tag": "0006_aspiring_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789995538064,
+      "tag": "0007_lyrical_vapor",
+      "breakpoints": true
     }
   ]
 }

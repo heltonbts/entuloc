@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, notExists } from 'drizzle-orm';
 import Link from 'next/link';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
@@ -51,6 +51,7 @@ export default async function PaginaLocacoes() {
           numeroOs: locacoes.numeroOs,
           status: locacoes.status,
           motoristaId: locacoes.motoristaId,
+          motivoCancelamento: locacoes.motivoCancelamento,
           endereco: locacoes.enderecoEntrega,
           valorLocacao: locacoes.valorLocacao,
           valorFrete: locacoes.valorFrete,
@@ -81,7 +82,18 @@ export default async function PaginaLocacoes() {
         .select({ id: cacambas.id, rotulo: cacambas.numeracao, tipo: tiposCacamba.nome })
         .from(cacambas)
         .innerJoin(tiposCacamba, eq(cacambas.tipoId, tiposCacamba.id))
-        .where(eq(cacambas.status, 'disponivel'))
+        .where(
+          and(
+            eq(cacambas.status, 'disponivel'),
+            // Fora as ja prometidas numa locacao agendada.
+            notExists(
+              db
+                .select({ id: locacoes.id })
+                .from(locacoes)
+                .where(and(eq(locacoes.cacambaId, cacambas.id), eq(locacoes.status, 'agendada'))),
+            ),
+          ),
+        )
         .orderBy(asc(cacambas.numeracao)),
       db
         .select({ id: cidades.id, rotulo: cidades.nome, uf: cidades.uf, frete: cidades.valorFrete })
@@ -193,6 +205,11 @@ export default async function PaginaLocacoes() {
                   </td>
                   <td className="px-4 py-3">
                     <Etiqueta tom={status.tom}>{status.texto}</Etiqueta>
+                    {l.motivoCancelamento && (
+                      <span className="text-navy-400 mt-1 block text-xs">
+                        {l.motivoCancelamento}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {['agendada', 'entregue', 'retirada_solicitada'].includes(l.status) ? (

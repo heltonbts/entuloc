@@ -7,18 +7,11 @@
  * primeiro acesso. Ninguem — nem quem roda o script — precisa saber a senha
  * definitiva de outra pessoa.
  */
-import { randomBytes } from 'node:crypto';
-
 import { eq } from 'drizzle-orm';
 
 import { getDb } from '../src/db';
 import { usuarios } from '../src/db/schema';
-import { gerarHashSenha } from '../src/server/auth/senha';
-
-function senhaProvisoria(): string {
-  // base64url sem caracteres ambiguos para ditar por telefone sem erro.
-  return randomBytes(12).toString('base64url').replace(/[-_]/g, 'x').slice(0, 14);
-}
+import { gerarHashSenha, senhaProvisoria } from '../src/server/auth/senha';
 
 async function main() {
   const [nome, email, papelArg] = process.argv.slice(2);

@@ -7,6 +7,7 @@ import { formatarBRL, formatarValor } from '@/lib/dinheiro';
 import type { EstadoForm } from '@/server/validacao';
 
 import {
+  cancelarLocacao,
   concluirLocacao,
   criarLocacao,
   registrarEntrega,
@@ -202,6 +203,36 @@ function AcaoComData({
   );
 }
 
+/** Em duas etapas (abrir + confirmar com motivo) para nao cancelar num toque sem querer. */
+function CancelarLocacao({ id }: { id: string }) {
+  const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(cancelarLocacao, {});
+
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer font-medium text-red-600 dark:text-red-400">
+        Cancelar
+      </summary>
+      <form action={acao} className="mt-2 flex flex-col gap-1">
+        <input type="hidden" name="id" value={id} />
+        <input
+          name="motivo"
+          placeholder="Motivo (ex.: cliente desistiu)"
+          aria-label="Motivo do cancelamento"
+          className="border-border-subtle bg-surface text-foreground rounded-md border px-2 py-1 text-xs"
+        />
+        <Botao type="submit" variante="perigo" disabled={enviando} className="px-3 py-1 text-xs">
+          {enviando ? 'Cancelando…' : 'Confirmar cancelamento'}
+        </Botao>
+        {(estado.erro || estado.campos?.motivo) && (
+          <span className="text-red-600 dark:text-red-400">
+            {estado.erro ?? estado.campos?.motivo}
+          </span>
+        )}
+      </form>
+    </details>
+  );
+}
+
 export function AcoesLocacao({
   id,
   status,
@@ -213,7 +244,10 @@ export function AcoesLocacao({
 }) {
   if (status === 'agendada') {
     return (
-      <AcaoComData acaoServidor={registrarEntrega} id={id} campo="entregaEm" rotulo="Entregar" />
+      <div className="flex flex-col gap-2">
+        <AcaoComData acaoServidor={registrarEntrega} id={id} campo="entregaEm" rotulo="Entregar" />
+        <CancelarLocacao id={id} />
+      </div>
     );
   }
   if (status === 'entregue') {

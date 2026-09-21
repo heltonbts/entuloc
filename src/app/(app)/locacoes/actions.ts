@@ -1,12 +1,13 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { cacambas, cidades, clientes, locacoes, tiposCacamba, usuarios } from '@/db/schema';
+import { STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
 import { apurarFechamento, comandosFechamento } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
@@ -65,6 +66,16 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
   if (!cacamba) return { ok: false, erro: 'Caçamba não encontrada.' };
   if (cacamba.status !== 'disponivel') {
     return { ok: false, erro: 'Essa caçamba não está disponível.' };
+  }
+  // Agendada ainda deixa a caçamba "disponivel" no cadastro; sem esta checagem
+  // daria para prometer a mesma caçamba para dois clientes.
+  const [reservada] = await db
+    .select({ id: locacoes.id, numeroOs: locacoes.numeroOs })
+    .from(locacoes)
+    .where(and(eq(locacoes.cacambaId, cacamba.id), inArray(locacoes.status, [...STATUS_ATIVOS])))
+    .limit(1);
+  if (reservada) {
+    return { ok: false, erro: `Essa caçamba já está reservada na OS Nº ${reservada.numeroOs}.` };
   }
 
   const [tipo] = await db
@@ -243,4 +254,40 @@ export async function trocarMotorista(form: FormData): Promise<void> {
 
   revalidatePath('/locacoes');
   revalidatePath('/campo');
+}
+
+/**
+ * Cancela uma locacao que ainda nao saiu para entrega. Depois de entregue nao
+ * se cancela: registra-se a retirada, que fecha e cobra o que foi usado.
+ */
+export async function cancelarLocacao(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('locacoes.criar');
+
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      motivo: z.string().trim().min(3, 'Informe o motivo do cancelamento'),
+    })
+    .safeParse({ id: form.get('id'), motivo: form.get('motivo') });
+  if (!parsed.success) return erroDeZod(parsed.error);
+
+  const [cancelada] = await getDb()
+    .update(locacoes)
+    .set({
+      status: 'cancelada',
+      motivoCancelamento: parsed.data.motivo,
+      atualizadoEm: new Date(),
+    })
+    // Condicao no proprio UPDATE: se o motorista registrar a entrega no mesmo
+    // instante, o cancelamento nao passa por cima dela.
+    .where(and(eq(locacoes.id, parsed.data.id), eq(locacoes.status, 'agendada')))
+    .returning({ id: locacoes.id });
+  if (!cancelada) {
+    return { ok: false, erro: 'Só dá para cancelar antes da entrega.' };
+  }
+
+  revalidatePath('/locacoes');
+  revalidatePath('/painel');
+  revalidatePath('/campo');
+  return { ok: true };
 }

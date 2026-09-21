@@ -149,6 +149,12 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
           </div>
         </header>
 
+        {locacao.status === 'cancelada' && (
+          <p className="rounded-lg border-2 border-red-600 px-4 py-3 text-center font-bold text-red-700">
+            OS CANCELADA — {locacao.motivoCancelamento}
+          </p>
+        )}
+
         <Bloco titulo="Cliente">
           <p className="text-navy-800 font-semibold">{cliente.nome}</p>
           <div className="mt-1 grid gap-1 sm:grid-cols-2 print:grid-cols-2">

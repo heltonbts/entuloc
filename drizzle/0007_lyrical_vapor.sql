@@ -1,0 +1,1 @@
+ALTER TABLE "locacoes" ADD COLUMN "motivo_cancelamento" text;

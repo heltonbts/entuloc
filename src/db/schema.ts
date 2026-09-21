@@ -233,6 +233,8 @@ export const locacoes = pgTable(
     observacoes: text('observacoes'),
     /** Funcionario que recebe a OS no celular. */
     motoristaId: uuid('motorista_id').references(() => usuarios.id, { onDelete: 'set null' }),
+    /** Por que a locacao foi cancelada — obrigatorio ao cancelar. */
+    motivoCancelamento: text('motivo_cancelamento'),
     /** Baixa da cacamba recolhida: para onde foi o entulho. Nulo = baixa pendente. */
     destinoEntulho: destinoEntulhoEnum('destino_entulho'),
     status: statusLocacaoEnum('status').notNull().default('orcamento'),
