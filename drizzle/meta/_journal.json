@@ -57,6 +57,13 @@
       "when": 1789995538064,
       "tag": "0007_lyrical_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789996723370,
+      "tag": "0008_cold_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

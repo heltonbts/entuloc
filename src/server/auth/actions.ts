@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { telaInicial } from '@/lib/dominio/tipos';
 import { usuarios } from '@/db/schema';
 import { erroDeZod, type EstadoForm } from '@/server/validacao';
 
@@ -69,7 +70,7 @@ export async function entrar(_estado: EstadoForm, form: FormData): Promise<Estad
     .where(eq(usuarios.id, usuario.id));
 
   await criarSessao(usuario.id);
-  redirect(usuario.precisaTrocarSenha ? '/trocar-senha' : '/painel');
+  redirect(usuario.precisaTrocarSenha ? '/trocar-senha' : telaInicial(usuario.papel));
 }
 
 export async function sair() {
@@ -125,5 +126,5 @@ export async function trocarSenha(_estado: EstadoForm, form: FormData): Promise<
   await encerrarTodasSessoes(usuario.id);
   await criarSessao(usuario.id);
 
-  redirect('/painel');
+  redirect(telaInicial(usuario.papel));
 }

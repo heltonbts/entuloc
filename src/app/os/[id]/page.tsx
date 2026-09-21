@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { alias } from 'drizzle-orm/pg-core';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 
@@ -11,6 +12,7 @@ import {
   cidades,
   clientes,
   locacoes,
+  prorrogacoes,
   registrosCampo,
   regrasMulta,
   tiposCacamba,
@@ -25,6 +27,8 @@ import { BotaoImprimir } from './imprimir';
 export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Ordem de Serviço' };
+
+const antigaOs = alias(locacoes, 'antiga');
 
 function formatarData(data: string | null): string {
   if (!data) return '____/____/______';
@@ -113,6 +117,22 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
     .limit(1);
   if (!os) notFound();
 
+  const trocaDeId = os.locacao.trocaDeId;
+  const [troca] = trocaDeId
+    ? await db
+        .select({ numeroOs: antigaOs.numeroOs, numeracao: cacambas.numeracao })
+        .from(antigaOs)
+        .innerJoin(cacambas, eq(antigaOs.cacambaId, cacambas.id))
+        .where(eq(antigaOs.id, trocaDeId))
+        .limit(1)
+    : [];
+
+  const extras = await db
+    .select()
+    .from(prorrogacoes)
+    .where(eq(prorrogacoes.locacaoId, id))
+    .orderBy(asc(prorrogacoes.criadoEm));
+
   const registros = await db
     .select()
     .from(registrosCampo)
@@ -122,7 +142,9 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
   const { locacao, cliente } = os;
   const numero = String(locacao.numeroOs).padStart(6, '0');
   const emitidaEm = locacao.criadoEm.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  const total = locacao.valorLocacao + locacao.valorFrete;
+  const prorrogado = extras.reduce((soma, p) => soma + p.valor, 0);
+  const diasExtras = extras.reduce((soma, p) => soma + p.dias, 0);
+  const total = locacao.valorLocacao + locacao.valorFrete + prorrogado;
 
   return (
     <div className="bg-navy-50 min-h-full py-8 print:bg-white print:py-0">
@@ -172,6 +194,13 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
           </div>
         </Bloco>
 
+        {troca && (
+          <p className="border-brand-500 bg-brand-50 text-navy-800 rounded-lg border-2 px-4 py-3 text-sm font-semibold">
+            TROCA — entregar esta caçamba vazia e recolher a caçamba {troca.numeracao} cheia (OS Nº{' '}
+            {String(troca.numeroOs).padStart(6, '0')}).
+          </p>
+        )}
+
         <Bloco titulo="Local da caçamba">
           <p className="text-navy-800 font-semibold">
             {locacao.enderecoEntrega} — {os.cidade}/{os.uf}
@@ -192,7 +221,7 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
           <Bloco titulo="Prazo">
             <Linha
               rotulo="Período"
-              valor={`${locacao.diasContratados} dias ${locacao.contagemPrazo === 'uteis' ? 'úteis' : 'corridos'}`}
+              valor={`${locacao.diasContratados + diasExtras} dias ${locacao.contagemPrazo === 'uteis' ? 'úteis' : 'corridos'}${diasExtras > 0 ? ` (${diasExtras} prorrogado)` : ''}`}
             />
             <Linha rotulo="Entrega" valor={formatarData(locacao.entregaEm)} />
             <Linha rotulo="Vencimento" valor={formatarData(locacao.vencimentoEm)} />
@@ -203,6 +232,13 @@ export default async function PaginaOrdemServico({ params }: PageProps<'/os/[id]
           <div className="flex flex-col gap-1">
             <Linha rotulo="Locação" valor={formatarBRL(locacao.valorLocacao)} />
             <Linha rotulo="Frete" valor={formatarBRL(locacao.valorFrete)} />
+            {extras.map((p) => (
+              <Linha
+                key={p.id}
+                rotulo={`Prorrogação +${p.dias} dia(s)`}
+                valor={formatarBRL(p.valor)}
+              />
+            ))}
             <Linha rotulo="Total" valor={<strong>{formatarBRL(total)}</strong>} />
           </div>
           <p className="text-navy-500 mt-2 text-xs">{descreverMulta(os.regra)}</p>

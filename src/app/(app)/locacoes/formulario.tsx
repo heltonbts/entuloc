@@ -4,12 +4,15 @@ import { useActionState, useState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
 import { formatarBRL, formatarValor } from '@/lib/dinheiro';
+import { valorProrrogacaoSugerido } from '@/lib/dominio/locacao';
 import type { EstadoForm } from '@/server/validacao';
 
 import {
   cancelarLocacao,
   concluirLocacao,
   criarLocacao,
+  pedirTroca,
+  prorrogar,
   registrarEntrega,
   solicitarRetirada,
   trocarMotorista,
@@ -233,37 +236,187 @@ function CancelarLocacao({ id }: { id: string }) {
   );
 }
 
-export function AcoesLocacao({
+function PedirTroca({
   id,
-  status,
-  podeFechar,
+  cacambasLivres,
+  freteCidade,
 }: {
+  id: string;
+  cacambasLivres: Opcao[];
+  freteCidade: number;
+}) {
+  const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(pedirTroca, {});
+
+  return (
+    <details className="text-xs">
+      <summary className="text-brand-600 cursor-pointer font-medium">Pedir troca</summary>
+      {cacambasLivres.length === 0 ? (
+        <p className="text-navy-400 mt-2">Nenhuma caçamba livre para levar.</p>
+      ) : (
+        <form action={acao} className="mt-2 flex flex-col gap-1">
+          <input type="hidden" name="id" value={id} />
+          <select
+            name="cacambaId"
+            aria-label="Caçamba vazia"
+            className="border-border-subtle bg-surface text-foreground rounded-md border px-2 py-1 text-xs"
+          >
+            {cacambasLivres.map((o) => (
+              <option key={o.id} value={o.id}>
+                Levar {o.rotulo}
+              </option>
+            ))}
+          </select>
+          <label className="text-navy-500 flex items-center gap-1">
+            Frete R$
+            <input
+              name="valorFrete"
+              defaultValue={formatarValor(freteCidade)}
+              inputMode="decimal"
+              className="border-border-subtle bg-surface text-foreground w-20 rounded-md border px-2 py-1 text-xs"
+            />
+          </label>
+          <Botao type="submit" disabled={enviando} className="px-3 py-1 text-xs">
+            {enviando ? 'Gerando…' : 'Gerar OS de troca'}
+          </Botao>
+          {(estado.erro || estado.campos) && (
+            <span className="text-red-600 dark:text-red-400">
+              {estado.erro ?? Object.values(estado.campos ?? {})[0]}
+            </span>
+          )}
+        </form>
+      )}
+    </details>
+  );
+}
+
+function Prorrogar({
+  id,
+  valorLocacao,
+  diasContratados,
+}: {
+  id: string;
+  valorLocacao: number;
+  diasContratados: number;
+}) {
+  const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(prorrogar, {});
+  const [dias, setDias] = useState('1');
+  const [valor, setValor] = useState(() =>
+    formatarValor(valorProrrogacaoSugerido(valorLocacao, diasContratados, 1)),
+  );
+
+  return (
+    <details className="text-xs">
+      <summary className="text-brand-600 cursor-pointer font-medium">Prorrogar</summary>
+      <form action={acao} className="mt-2 flex flex-col gap-1">
+        <input type="hidden" name="id" value={id} />
+        <label className="text-navy-500 flex items-center gap-1">
+          Dias a mais
+          <input
+            name="dias"
+            type="number"
+            min={1}
+            value={dias}
+            onChange={(e) => {
+              setDias(e.target.value);
+              const n = Number(e.target.value);
+              // Sugere o proporcional; quem digitar outro valor depois mantem o dele.
+              if (Number.isInteger(n) && n > 0) {
+                setValor(formatarValor(valorProrrogacaoSugerido(valorLocacao, diasContratados, n)));
+              }
+            }}
+            className="border-border-subtle bg-surface text-foreground w-14 rounded-md border px-2 py-1 text-xs"
+          />
+        </label>
+        <label className="text-navy-500 flex items-center gap-1">
+          Valor R$
+          <input
+            name="valor"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            inputMode="decimal"
+            className="border-border-subtle bg-surface text-foreground w-20 rounded-md border px-2 py-1 text-xs"
+          />
+        </label>
+        <Botao type="submit" disabled={enviando} className="px-3 py-1 text-xs">
+          {enviando ? 'Salvando…' : 'Confirmar prorrogação'}
+        </Botao>
+        {estado.ok && <span className="text-emerald-700 dark:text-emerald-300">Prorrogado.</span>}
+        {(estado.erro || estado.campos) && (
+          <span className="text-red-600 dark:text-red-400">
+            {estado.erro ?? Object.values(estado.campos ?? {})[0]}
+          </span>
+        )}
+      </form>
+    </details>
+  );
+}
+
+export type DadosAcoes = {
   id: string;
   status: string;
   podeFechar: boolean;
-}) {
-  if (status === 'agendada') {
+  /** Esta locacao e a OS de uma troca (entra a vazia). */
+  ehTroca: boolean;
+  /** Esta locacao (cheia) ja tem uma troca agendada. */
+  trocaAgendada: boolean;
+  valorLocacao: number;
+  diasContratados: number;
+  freteCidade: number;
+  cacambasLivres: Opcao[];
+};
+
+export function AcoesLocacao(d: DadosAcoes) {
+  const nota = (texto: string) => <span className="text-navy-400 text-xs">{texto}</span>;
+
+  if (d.status === 'agendada') {
     return (
       <div className="flex flex-col gap-2">
-        <AcaoComData acaoServidor={registrarEntrega} id={id} campo="entregaEm" rotulo="Entregar" />
-        <CancelarLocacao id={id} />
+        {d.ehTroca ? (
+          nota('Troca: motorista registra no app')
+        ) : (
+          <AcaoComData
+            acaoServidor={registrarEntrega}
+            id={d.id}
+            campo="entregaEm"
+            rotulo="Entregar"
+          />
+        )}
+        <CancelarLocacao id={d.id} />
       </div>
     );
   }
-  if (status === 'entregue') {
-    return (
-      <AcaoComData acaoServidor={solicitarRetirada} id={id} campo="em" rotulo="Pedir retirada" />
-    );
-  }
-  if (status === 'retirada_solicitada' && podeFechar) {
-    return (
-      <AcaoComData acaoServidor={concluirLocacao} id={id} campo="retiradaEm" rotulo="Concluir" />
-    );
-  }
-  if (status === 'retirada_solicitada') {
-    return <span className="text-navy-400 text-xs">Aguardando fechamento pelo gestor</span>;
-  }
-  return <span className="text-navy-400 text-xs">—</span>;
+
+  const noCliente = d.status === 'entregue' || d.status === 'retirada_solicitada';
+  if (!noCliente) return nota('—');
+  if (d.trocaAgendada) return nota('Troca agendada');
+
+  return (
+    <div className="flex flex-col gap-2">
+      {d.status === 'entregue' && (
+        <AcaoComData
+          acaoServidor={solicitarRetirada}
+          id={d.id}
+          campo="em"
+          rotulo="Pedir retirada"
+        />
+      )}
+      {d.status === 'retirada_solicitada' &&
+        (d.podeFechar ? (
+          <AcaoComData
+            acaoServidor={concluirLocacao}
+            id={d.id}
+            campo="retiradaEm"
+            rotulo="Concluir"
+          />
+        ) : (
+          nota('Aguardando retirada')
+        ))}
+      <PedirTroca id={d.id} cacambasLivres={d.cacambasLivres} freteCidade={d.freteCidade} />
+      {d.status === 'entregue' && (
+        <Prorrogar id={d.id} valorLocacao={d.valorLocacao} diasContratados={d.diasContratados} />
+      )}
+    </div>
+  );
 }
 
 export function TrocarMotorista({

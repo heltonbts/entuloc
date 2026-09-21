@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, notExists } from 'drizzle-orm';
+import { and, asc, desc, eq, notExists, sql } from 'drizzle-orm';
 import Link from 'next/link';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
@@ -8,6 +8,7 @@ import {
   cidades,
   clientes,
   locacoes,
+  prorrogacoes,
   regrasMulta,
   tiposCacamba,
   usuarios,
@@ -52,6 +53,13 @@ export default async function PaginaLocacoes() {
           status: locacoes.status,
           motoristaId: locacoes.motoristaId,
           motivoCancelamento: locacoes.motivoCancelamento,
+          trocaDeId: locacoes.trocaDeId,
+          diasContratados: locacoes.diasContratados,
+          freteCidade: cidades.valorFrete,
+          prorrogado:
+            sql<number>`(select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${prorrogacoes.locacaoId} = ${locacoes.id})`.mapWith(
+              Number,
+            ),
           endereco: locacoes.enderecoEntrega,
           valorLocacao: locacoes.valorLocacao,
           valorFrete: locacoes.valorFrete,
@@ -112,6 +120,14 @@ export default async function PaginaLocacoes() {
     ]);
 
   const podeFechar = podeAcessar(usuario.papel, 'locacoes.fechar');
+  // Cheias com troca agendada (a OS nova aponta para elas).
+  const comTrocaAgendada = new Set(
+    lista.filter((l) => l.status === 'agendada' && l.trocaDeId).map((l) => l.trocaDeId),
+  );
+  const cacambasLivres = opcoesCacamba.map((c) => ({
+    id: c.id,
+    rotulo: `${c.rotulo} — ${c.tipo}`,
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -131,7 +147,7 @@ export default async function PaginaLocacoes() {
             ...c,
             rotulo: c.construtora ? `${c.rotulo} (construtora)` : c.rotulo,
           }))}
-          cacambas={opcoesCacamba.map((c) => ({ id: c.id, rotulo: `${c.rotulo} — ${c.tipo}` }))}
+          cacambas={cacambasLivres}
           cidades={opcoesCidade.map((c) => ({
             id: c.id,
             nome: c.rotulo,
@@ -165,7 +181,7 @@ export default async function PaginaLocacoes() {
           >
             {lista.map((l) => {
               const status = rotuloStatus[l.status] ?? { texto: l.status, tom: 'neutro' as const };
-              const total = l.valorLocacao + l.valorFrete + (l.multaApurada ?? 0);
+              const total = l.valorLocacao + l.valorFrete + l.prorrogado + (l.multaApurada ?? 0);
               return (
                 <tr key={l.id}>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -197,6 +213,11 @@ export default async function PaginaLocacoes() {
                     <span className="text-navy-700 block font-semibold dark:text-white">
                       {formatarBRL(total)}
                     </span>
+                    {l.prorrogado > 0 && (
+                      <span className="text-navy-400 block text-xs">
+                        prorrogação {formatarBRL(l.prorrogado)}
+                      </span>
+                    )}
                     {(l.multaApurada ?? 0) > 0 && (
                       <span className="text-xs text-red-600 dark:text-red-400">
                         multa {formatarBRL(l.multaApurada ?? 0)}
@@ -221,7 +242,17 @@ export default async function PaginaLocacoes() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <AcoesLocacao id={l.id} status={l.status} podeFechar={podeFechar} />
+                    <AcoesLocacao
+                      id={l.id}
+                      status={l.status}
+                      podeFechar={podeFechar}
+                      ehTroca={l.trocaDeId !== null}
+                      trocaAgendada={comTrocaAgendada.has(l.id)}
+                      valorLocacao={l.valorLocacao}
+                      diasContratados={l.diasContratados}
+                      freteCidade={l.freteCidade}
+                      cacambasLivres={cacambasLivres}
+                    />
                   </td>
                 </tr>
               );

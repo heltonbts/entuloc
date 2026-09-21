@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { hojeEmSaoPaulo, proximaEtapa, situacaoAluguel } from './locacao';
+import {
+  hojeEmSaoPaulo,
+  momentoDoRegistro,
+  proximaEtapa,
+  situacaoAluguel,
+  valorProrrogacaoSugerido,
+} from './locacao';
 
 const base = {
   status: 'entregue' as const,
@@ -66,6 +72,10 @@ describe('proximaEtapa', () => {
     expect(proximaEtapa({ ...os, status: 'agendada' })).toBe('entrega');
   });
 
+  it('agendada que substitui outra -> troca', () => {
+    expect(proximaEtapa({ ...os, status: 'agendada', ehTroca: true })).toBe('troca');
+  });
+
   it('no cliente -> retirada, com ou sem pedido', () => {
     expect(proximaEtapa({ ...os, status: 'entregue' })).toBe('retirada');
     expect(proximaEtapa({ ...os, status: 'retirada_solicitada' })).toBe('retirada');
@@ -87,5 +97,41 @@ describe('proximaEtapa', () => {
 
   it('cancelada, nada a fazer', () => {
     expect(proximaEtapa({ ...os, status: 'cancelada' })).toBeNull();
+  });
+});
+
+describe('valorProrrogacaoSugerido', () => {
+  it('proporcional ao valor por dia', () => {
+    expect(valorProrrogacaoSugerido(50_000, 5, 1)).toBe(10_000);
+    expect(valorProrrogacaoSugerido(50_000, 5, 3)).toBe(30_000);
+  });
+
+  it('arredonda para o centavo', () => {
+    expect(valorProrrogacaoSugerido(10_000, 3, 1)).toBe(3_333);
+  });
+});
+
+describe('momentoDoRegistro', () => {
+  const recebido = new Date('2026-09-21T15:00:00Z');
+
+  it('sem hora do celular usa a do servidor', () => {
+    expect(momentoDoRegistro(null, recebido)).toEqual(recebido);
+  });
+
+  it('foto tirada sem sinal horas antes vale a hora da foto', () => {
+    const foto = new Date('2026-09-21T09:30:00Z');
+    expect(momentoDoRegistro(foto, recebido)).toEqual(foto);
+  });
+
+  it('celular levemente adiantado usa a do servidor', () => {
+    expect(momentoDoRegistro(new Date('2026-09-21T15:03:00Z'), recebido)).toEqual(recebido);
+  });
+
+  it('celular muito adiantado e ignorado', () => {
+    expect(momentoDoRegistro(new Date('2026-09-22T15:00:00Z'), recebido)).toEqual(recebido);
+  });
+
+  it('fila de mais de 3 dias e ignorada (relogio errado)', () => {
+    expect(momentoDoRegistro(new Date('2026-09-10T15:00:00Z'), recebido)).toEqual(recebido);
   });
 });

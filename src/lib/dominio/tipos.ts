@@ -203,3 +203,8 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
 export function podeAcessar(papel: Papel, permissao: Permissao): boolean {
   return PERMISSOES_POR_PAPEL[papel].includes(permissao);
 }
+
+/** Tela inicial de cada papel: o funcionario trabalha nas OS, o gestor no painel. */
+export function telaInicial(papel: Papel): '/campo' | '/painel' {
+  return papel === 'funcionario' ? '/campo' : '/painel';
+}

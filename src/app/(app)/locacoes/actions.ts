@@ -1,17 +1,26 @@
 'use server';
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sum } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { cacambas, cidades, clientes, locacoes, tiposCacamba, usuarios } from '@/db/schema';
-import { STATUS_ATIVOS } from '@/lib/dominio/locacao';
+import {
+  cacambas,
+  cidades,
+  clientes,
+  locacoes,
+  prorrogacoes,
+  tiposCacamba,
+  usuarios,
+} from '@/db/schema';
+import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
+import { violou } from '@/server/erros';
 import { apurarFechamento, comandosFechamento } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
-import { dinheiro, erroDeZod, type EstadoForm } from '@/server/validacao';
+import { dinheiro, erroDeZod, inteiroPositivo, type EstadoForm } from '@/server/validacao';
 
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
 
@@ -137,6 +146,9 @@ export async function registrarEntrega(_estado: EstadoForm, form: FormData): Pro
     .limit(1);
   if (!locacao) return { ok: false, erro: 'Locação não encontrada.' };
   if (locacao.status !== 'agendada') return { ok: false, erro: 'Essa locação já foi entregue.' };
+  if (locacao.trocaDeId) {
+    return { ok: false, erro: 'Troca é registrada pelo motorista em Minhas OS (duas fotos).' };
+  }
 
   const vencimentoEm = calcularVencimento(
     parsed.data.entregaEm,
@@ -289,5 +301,148 @@ export async function cancelarLocacao(_estado: EstadoForm, form: FormData): Prom
   revalidatePath('/locacoes');
   revalidatePath('/painel');
   revalidatePath('/campo');
+  return { ok: true };
+}
+
+/** Caçamba livre de verdade: disponivel no cadastro e sem locacao ativa prometendo ela. */
+async function cacambaLivre(cacambaId: string) {
+  const db = getDb();
+  const [cacamba] = await db
+    .select({ id: cacambas.id, status: cacambas.status, tipoId: cacambas.tipoId })
+    .from(cacambas)
+    .where(eq(cacambas.id, cacambaId))
+    .limit(1);
+  if (!cacamba || cacamba.status !== 'disponivel') return null;
+  const [reservada] = await db
+    .select({ id: locacoes.id })
+    .from(locacoes)
+    .where(and(eq(locacoes.cacambaId, cacambaId), inArray(locacoes.status, [...STATUS_ATIVOS])))
+    .limit(1);
+  return reservada ? null : cacamba;
+}
+
+/**
+ * Troca: o cliente pede uma vazia no lugar da cheia. Gera a OS da troca (nova
+ * locacao, mesmo endereco e motorista) e marca a cheia como retirada pedida
+ * hoje — o atraso dela para de contar no pedido, como em qualquer retirada.
+ */
+export async function pedirTroca(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const usuario = await exigirPermissao('locacoes.criar');
+
+  const parsed = z
+    .object({ id: z.uuid(), cacambaId: z.uuid('Escolha a caçamba vazia'), valorFrete: dinheiro })
+    .safeParse({
+      id: form.get('id'),
+      cacambaId: form.get('cacambaId'),
+      valorFrete: form.get('valorFrete'),
+    });
+  if (!parsed.success) return erroDeZod(parsed.error);
+
+  const db = getDb();
+  const [cheia] = await db.select().from(locacoes).where(eq(locacoes.id, parsed.data.id)).limit(1);
+  if (!cheia || (cheia.status !== 'entregue' && cheia.status !== 'retirada_solicitada')) {
+    return { ok: false, erro: 'Só dá para trocar caçamba que está no cliente.' };
+  }
+
+  const vazia = await cacambaLivre(parsed.data.cacambaId);
+  if (!vazia) return { ok: false, erro: 'Essa caçamba não está livre.' };
+  const [tipo] = await db
+    .select()
+    .from(tiposCacamba)
+    .where(eq(tiposCacamba.id, vazia.tipoId))
+    .limit(1);
+  if (!tipo || tipo.valorLocacao === 0) {
+    return { ok: false, erro: 'O tipo dessa caçamba está sem valor definido.' };
+  }
+
+  let novaId: string;
+  try {
+    const [resultado] = await db.batch([
+      db
+        .insert(locacoes)
+        .values({
+          trocaDeId: cheia.id,
+          clienteId: cheia.clienteId,
+          cacambaId: vazia.id,
+          cidadeId: cheia.cidadeId,
+          enderecoEntrega: cheia.enderecoEntrega,
+          observacoes: cheia.observacoes,
+          motoristaId: cheia.motoristaId,
+          regraMultaId: cheia.regraMultaId,
+          status: 'agendada',
+          valorLocacao: tipo.valorLocacao,
+          valorFrete: parsed.data.valorFrete,
+          diasContratados: tipo.diasInclusos,
+          contagemPrazo: tipo.contagemPrazo,
+          criadoPorId: usuario.id,
+        })
+        .returning({ id: locacoes.id }),
+      db
+        .update(locacoes)
+        .set({
+          status: 'retirada_solicitada',
+          retiradaSolicitadaEm: cheia.retiradaSolicitadaEm ?? hojeEmSaoPaulo(),
+          atualizadoEm: new Date(),
+        })
+        .where(eq(locacoes.id, cheia.id)),
+    ]);
+    novaId = resultado[0].id;
+  } catch (erro) {
+    if (violou(erro, 'locacoes_troca_unica')) {
+      return { ok: false, erro: 'Essa caçamba já tem uma troca agendada.' };
+    }
+    throw erro;
+  }
+
+  revalidatePath('/locacoes');
+  revalidatePath('/campo');
+  revalidatePath('/painel');
+  redirect(`/os/${novaId}`);
+}
+
+/**
+ * Prorrogacao: dias a mais depois da entrega. O valor fica registrado e entra
+ * na cobranca do fechamento; o vencimento anda na hora (e a multa com ele).
+ */
+export async function prorrogar(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const usuario = await exigirPermissao('locacoes.criar');
+
+  const parsed = z
+    .object({ id: z.uuid(), dias: inteiroPositivo, valor: dinheiro })
+    .safeParse({ id: form.get('id'), dias: form.get('dias'), valor: form.get('valor') });
+  if (!parsed.success) return erroDeZod(parsed.error);
+
+  const db = getDb();
+  const [locacao] = await db
+    .select()
+    .from(locacoes)
+    .where(eq(locacoes.id, parsed.data.id))
+    .limit(1);
+  if (!locacao || locacao.status !== 'entregue' || !locacao.entregaEm) {
+    return { ok: false, erro: 'Só dá para prorrogar caçamba entregue e sem retirada pedida.' };
+  }
+
+  const [anteriores] = await db
+    .select({ dias: sum(prorrogacoes.dias).mapWith(Number) })
+    .from(prorrogacoes)
+    .where(eq(prorrogacoes.locacaoId, locacao.id));
+  const diasTotais = locacao.diasContratados + (anteriores?.dias ?? 0) + parsed.data.dias;
+  const vencimentoEm = calcularVencimento(locacao.entregaEm, diasTotais, locacao.contagemPrazo);
+
+  await db.batch([
+    db.insert(prorrogacoes).values({
+      locacaoId: locacao.id,
+      dias: parsed.data.dias,
+      valor: parsed.data.valor,
+      registradoPorId: usuario.id,
+    }),
+    db
+      .update(locacoes)
+      .set({ vencimentoEm, atualizadoEm: new Date() })
+      .where(and(eq(locacoes.id, locacao.id), eq(locacoes.status, 'entregue'))),
+  ]);
+
+  revalidatePath('/locacoes');
+  revalidatePath('/painel');
   return { ok: true };
 }

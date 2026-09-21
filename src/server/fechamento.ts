@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, sum } from 'drizzle-orm';
 
 import { getDb } from '@/db';
-import { cobrancas, locacoes, regrasMulta } from '@/db/schema';
+import { cobrancas, locacoes, prorrogacoes, regrasMulta } from '@/db/schema';
 import { calcularMulta } from '@/lib/dominio/orcamento';
 import { calcularDiasAtraso } from '@/lib/dominio/prazo';
 import type { DataISO, RegraMulta } from '@/lib/dominio/tipos';
@@ -43,7 +43,18 @@ export async function apurarFechamento(locacao: Locacao, retiradaEm: DataISO) {
     }
   }
 
-  return { diasAtraso, multa, total: locacao.valorLocacao + locacao.valorFrete + multa };
+  const [extra] = await getDb()
+    .select({ valor: sum(prorrogacoes.valor).mapWith(Number) })
+    .from(prorrogacoes)
+    .where(eq(prorrogacoes.locacaoId, locacao.id));
+  const prorrogado = extra?.valor ?? 0;
+
+  return {
+    diasAtraso,
+    multa,
+    prorrogado,
+    total: locacao.valorLocacao + locacao.valorFrete + prorrogado + multa,
+  };
 }
 
 /** Comandos que encerram a locacao e geram a conta a receber — rodar dentro de um batch. */
@@ -67,10 +78,13 @@ export function comandosFechamento(
       clienteId: locacao.clienteId,
       origem: 'locacao',
       locacaoId: locacao.id,
-      descricao:
-        apurado.multa > 0
-          ? `Locação de caçamba — OS ${locacao.numeroOs} (${apurado.diasAtraso} dia(s) de atraso)`
-          : `Locação de caçamba — OS ${locacao.numeroOs}`,
+      descricao: [
+        `Locação de caçamba — OS ${locacao.numeroOs}`,
+        apurado.prorrogado > 0 && 'com prorrogação',
+        apurado.multa > 0 && `${apurado.diasAtraso} dia(s) de atraso`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       valorTotal: apurado.total,
       vencimentoEm: retiradaEm,
     }),

@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -10,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -233,6 +235,13 @@ export const locacoes = pgTable(
     observacoes: text('observacoes'),
     /** Funcionario que recebe a OS no celular. */
     motoristaId: uuid('motorista_id').references(() => usuarios.id, { onDelete: 'set null' }),
+    /**
+     * Troca: esta locacao substitui a indicada (cacamba vazia entra, a cheia
+     * sai na mesma viagem).
+     */
+    trocaDeId: uuid('troca_de_id').references((): AnyPgColumn => locacoes.id, {
+      onDelete: 'restrict',
+    }),
     /** Por que a locacao foi cancelada — obrigatorio ao cancelar. */
     motivoCancelamento: text('motivo_cancelamento'),
     /** Baixa da cacamba recolhida: para onde foi o entulho. Nulo = baixa pendente. */
@@ -264,10 +273,42 @@ export const locacoes = pgTable(
   (t) => [
     check('locacoes_valores_nao_negativos', sql`${t.valorLocacao} >= 0 AND ${t.valorFrete} >= 0`),
     check('locacoes_dias_positivo', sql`${t.diasContratados} >= 1`),
+    // Uma troca viva por locacao; a cancelada nao conta, para poder pedir de novo.
+    uniqueIndex('locacoes_troca_unica')
+      .on(t.trocaDeId)
+      .where(sql`${t.status} <> 'cancelada'`),
     check(
       'locacoes_retirada_apos_entrega',
       sql`${t.retiradaEm} IS NULL OR ${t.entregaEm} IS NULL OR ${t.retiradaEm} >= ${t.entregaEm}`,
     ),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
+ * Prorrogacoes
+ * ------------------------------------------------------------------ */
+
+/**
+ * Dias a mais combinados com o cliente depois da entrega. O valor e congelado
+ * aqui e somado na cobranca do fechamento; a locacao guarda so o vencimento novo.
+ */
+export const prorrogacoes = pgTable(
+  'prorrogacoes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    locacaoId: uuid('locacao_id')
+      .notNull()
+      .references(() => locacoes.id, { onDelete: 'cascade' }),
+    dias: integer('dias').notNull(),
+    valor: integer('valor').notNull(), // centavos
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+    criadoEm,
+  },
+  (t) => [
+    check('prorrogacoes_dias_positivo', sql`${t.dias} >= 1`),
+    check('prorrogacoes_valor_nao_negativo', sql`${t.valor} >= 0`),
   ],
 );
 
@@ -289,7 +330,13 @@ export const registrosCampo = pgTable(
     etapa: etapaCampoEnum('etapa').notNull(),
     /** Caminho da foto no Vercel Blob (privado). */
     fotoPathname: text('foto_pathname').notNull(),
+    /** Quando o servidor recebeu. */
     registradoEm: timestamp('registrado_em', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Quando a foto foi tirada, pelo relogio do celular. So difere de
+     * `registradoEm` quando o registro ficou na fila esperando sinal.
+     */
+    capturadoEm: timestamp('capturado_em', { withTimezone: true }),
     /** GPS do celular, quando o motorista permite. */
     latitude: numeric('latitude', { precision: 9, scale: 6 }),
     longitude: numeric('longitude', { precision: 9, scale: 6 }),
