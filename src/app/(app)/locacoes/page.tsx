@@ -121,6 +121,7 @@ export default async function PaginaLocacoes() {
     ]);
 
   const podeFechar = podeAcessar(usuario.papel, 'locacoes.fechar');
+  const podeApagar = podeAcessar(usuario.papel, 'locacoes.apagar');
   // Cheias com troca agendada (a OS nova aponta para elas).
   const comTrocaAgendada = new Set(
     lista.filter((l) => l.status === 'agendada' && l.trocaDeId).map((l) => l.trocaDeId),
@@ -247,6 +248,7 @@ export default async function PaginaLocacoes() {
                       id={l.id}
                       status={l.status}
                       podeFechar={podeFechar}
+                      podeApagar={podeApagar}
                       ehTroca={l.trocaDeId !== null}
                       trocaAgendada={comTrocaAgendada.has(l.id)}
                       valorLocacao={l.valorLocacao}

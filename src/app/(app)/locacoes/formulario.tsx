@@ -8,6 +8,7 @@ import { hojeEmSaoPaulo, valorProrrogacaoSugerido } from '@/lib/dominio/locacao'
 import type { EstadoForm } from '@/server/validacao';
 
 import {
+  apagarLocacao,
   cancelarLocacao,
   concluirLocacao,
   criarLocacao,
@@ -237,6 +238,29 @@ function CancelarLocacao({ id }: { id: string }) {
   );
 }
 
+/** Some com a OS de vez: em duas etapas, e avisando o que vai junto. */
+function ApagarLocacao({ id }: { id: string }) {
+  const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(apagarLocacao, {});
+
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer font-medium text-red-600 dark:text-red-400">
+        Apagar
+      </summary>
+      <form action={acao} className="mt-2 flex max-w-48 flex-col gap-1">
+        <input type="hidden" name="id" value={id} />
+        <span className="text-navy-500 dark:text-navy-200">
+          Apaga a OS, as fotos e as cobranças dela. Não dá para desfazer.
+        </span>
+        <Botao type="submit" variante="perigo" disabled={enviando} className="px-3 py-1 text-xs">
+          {enviando ? 'Apagando…' : 'Apagar de vez'}
+        </Botao>
+        {estado.erro && <span className="text-red-600 dark:text-red-400">{estado.erro}</span>}
+      </form>
+    </details>
+  );
+}
+
 function PedirTroca({
   id,
   cacambasLivres,
@@ -356,6 +380,7 @@ export type DadosAcoes = {
   id: string;
   status: string;
   podeFechar: boolean;
+  podeApagar: boolean;
   /** Esta locacao e a OS de uma troca (entra a vazia). */
   ehTroca: boolean;
   /** Esta locacao (cheia) ja tem uma troca agendada. */
@@ -367,6 +392,16 @@ export type DadosAcoes = {
 };
 
 export function AcoesLocacao(d: DadosAcoes) {
+  if (!d.podeApagar) return <AcoesDoStatus {...d} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <AcoesDoStatus {...d} />
+      <ApagarLocacao id={d.id} />
+    </div>
+  );
+}
+
+function AcoesDoStatus(d: DadosAcoes) {
   const nota = (texto: string) => <span className="text-navy-400 text-xs">{texto}</span>;
 
   if (d.status === 'agendada') {

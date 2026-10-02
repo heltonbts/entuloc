@@ -165,6 +165,7 @@ export type Permissao =
   | 'materiais.editar'
   | 'vendas.registrar'
   | 'locacoes.fechar'
+  | 'locacoes.apagar'
   | 'frota.editar'
   | 'clientes.editar'
   | 'locacoes.criar'
@@ -185,6 +186,7 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'materiais.editar',
     'vendas.registrar',
     'locacoes.fechar',
+    'locacoes.apagar',
     'frota.editar',
     'clientes.editar',
     'locacoes.criar',

@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, inArray, sum } from 'drizzle-orm';
+import { and, eq, inArray, or, sum } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -10,10 +10,16 @@ import {
   cacambas,
   cidades,
   clientes,
+  cobrancas,
+  itensFatura,
   locacoes,
+  movimentosEstoque,
   prorrogacoes,
+  recebimentos,
+  registrosCampo,
   tiposCacamba,
   usuarios,
+  vendasMaterial,
 } from '@/db/schema';
 import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
@@ -24,6 +30,7 @@ import {
   comandosFechamento,
 } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
+import { apagarFoto } from '@/server/fotos';
 import { dinheiro, erroDeZod, inteiroPositivo, type EstadoForm } from '@/server/validacao';
 
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
@@ -309,6 +316,95 @@ export async function cancelarLocacao(_estado: EstadoForm, form: FormData): Prom
   revalidatePath('/locacoes');
   revalidatePath('/painel');
   revalidatePath('/campo');
+  return { ok: true };
+}
+
+/**
+ * Apaga a locacao de vez (lancamento errado, teste). So o gestor. Leva junto o
+ * que nasceu dela: fotos, prorrogacoes, cobrancas, venda do entulho e entrada
+ * no deposito. Recusa quando apagar deixaria dinheiro ou outra OS sem origem.
+ */
+export async function apagarLocacao(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('locacoes.apagar');
+
+  const parsed = z.object({ id: z.uuid() }).safeParse({ id: form.get('id') });
+  if (!parsed.success) return erroDeZod(parsed.error);
+
+  const db = getDb();
+  const [locacao] = await db
+    .select()
+    .from(locacoes)
+    .where(eq(locacoes.id, parsed.data.id))
+    .limit(1);
+  if (!locacao) return { ok: false, erro: 'Locação não encontrada.' };
+
+  const [troca] = await db
+    .select({ numeroOs: locacoes.numeroOs })
+    .from(locacoes)
+    .where(eq(locacoes.trocaDeId, locacao.id))
+    .limit(1);
+  if (troca) {
+    return { ok: false, erro: `Apague antes a OS Nº ${troca.numeroOs}, da troca desta caçamba.` };
+  }
+
+  const [naFatura] = await db
+    .select({ id: itensFatura.id })
+    .from(itensFatura)
+    .where(eq(itensFatura.locacaoId, locacao.id))
+    .limit(1);
+  if (naFatura) return { ok: false, erro: 'Essa locação já foi cobrada numa fatura.' };
+
+  const [venda] = await db
+    .select({ id: vendasMaterial.id })
+    .from(vendasMaterial)
+    .where(eq(vendasMaterial.locacaoId, locacao.id))
+    .limit(1);
+  const origemCobranca = venda
+    ? or(eq(cobrancas.locacaoId, locacao.id), eq(cobrancas.vendaId, venda.id))
+    : eq(cobrancas.locacaoId, locacao.id);
+
+  const [pago] = await db
+    .select({ id: recebimentos.id })
+    .from(recebimentos)
+    .innerJoin(cobrancas, eq(recebimentos.cobrancaId, cobrancas.id))
+    .where(origemCobranca)
+    .limit(1);
+  if (pago) {
+    return { ok: false, erro: 'Essa locação já tem pagamento recebido — não dá para apagar.' };
+  }
+
+  const fotos = await db
+    .select({ pathname: registrosCampo.fotoPathname })
+    .from(registrosCampo)
+    .where(eq(registrosCampo.locacaoId, locacao.id));
+
+  // A caçamba so volta para o patio se ainda estava com o cliente por esta OS.
+  const noCliente = locacao.status === 'entregue' || locacao.status === 'retirada_solicitada';
+
+  await db.batch([
+    db.delete(cobrancas).where(origemCobranca),
+    db.delete(vendasMaterial).where(eq(vendasMaterial.locacaoId, locacao.id)),
+    db.delete(movimentosEstoque).where(eq(movimentosEstoque.locacaoId, locacao.id)),
+    // Prorrogacoes e registros de campo saem em cascata.
+    db.delete(locacoes).where(eq(locacoes.id, locacao.id)),
+    ...(noCliente
+      ? [
+          db
+            .update(cacambas)
+            .set({ status: 'disponivel', atualizadoEm: new Date() })
+            .where(eq(cacambas.id, locacao.cacambaId)),
+        ]
+      : []),
+  ]);
+
+  await Promise.all(fotos.map((f) => apagarFoto(f.pathname)));
+
+  revalidatePath('/locacoes');
+  revalidatePath('/painel');
+  revalidatePath('/campo');
+  revalidatePath('/financeiro');
+  revalidatePath('/deposito');
+  revalidatePath('/cadastros/frota');
   return { ok: true };
 }
 
