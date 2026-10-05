@@ -25,6 +25,7 @@ const hoje = () => hojeEmSaoPaulo();
 type Opcao = { id: string; rotulo: string };
 
 export type OpcaoCliente = Opcao & { endereco: string; cidade: string; uf: string };
+export type OpcaoCacamba = Opcao & { valor: number };
 export type OpcaoCidade = Opcao & { nome: string; uf: string; frete: number };
 
 /** Compara nomes de cidade ignorando acento e maiusculas ("Sao Jose" = "São José"). */
@@ -50,7 +51,7 @@ export function FormularioLocacao({
   motoristas,
 }: {
   clientes: OpcaoCliente[];
-  cacambas: Opcao[];
+  cacambas: OpcaoCacamba[];
   cidades: OpcaoCidade[];
   regras: Opcao[];
   motoristas: Opcao[];
@@ -61,6 +62,8 @@ export function FormularioLocacao({
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? '');
   const [cidadeId, setCidadeId] = useState(inicial?.id ?? '');
   const [frete, setFrete] = useState(inicial ? formatarValor(inicial.frete) : '');
+  const [cacambaId, setCacambaId] = useState(cacambas[0]?.id ?? '');
+  const [valor, setValor] = useState(cacambas[0]?.valor ? formatarValor(cacambas[0].valor) : '');
 
   if (cacambas.length === 0 || clientes.length === 0 || cidades.length === 0) {
     return (
@@ -77,6 +80,12 @@ export function FormularioLocacao({
     setCidadeId(id);
     const cidade = cidades.find((c) => c.id === id);
     if (cidade) setFrete(formatarValor(cidade.frete));
+  }
+
+  function escolherCacamba(id: string) {
+    setCacambaId(id);
+    const cacamba = cacambas.find((c) => c.id === id);
+    if (cacamba) setValor(cacamba.valor ? formatarValor(cacamba.valor) : '');
   }
 
   function escolherCliente(id: string) {
@@ -103,7 +112,12 @@ export function FormularioLocacao({
             </option>
           ))}
         </Select>
-        <Select label="Caçamba disponível" name="cacambaId">
+        <Select
+          label="Caçamba disponível"
+          name="cacambaId"
+          value={cacambaId}
+          onChange={(e) => escolherCacamba(e.target.value)}
+        >
           {cacambas.map((o) => (
             <option key={o.id} value={o.id}>
               {o.rotulo}
@@ -117,6 +131,17 @@ export function FormularioLocacao({
         placeholder={cliente?.endereco ?? 'Rua, número, bairro'}
         dica="Deixe em branco para entregar no endereço do cadastro. Preencha só se for diferente."
         erro={estado.campos?.enderecoEntrega}
+      />
+      <Campo
+        label="Valor da locação"
+        name="valorLocacao"
+        prefixo="R$"
+        inputMode="decimal"
+        placeholder="0,00"
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        dica="Vem da tabela do tipo; mude se combinou outro preço com o cliente."
+        erro={estado.campos?.valorLocacao}
       />
       <div className="grid gap-4 sm:grid-cols-3">
         <Select
@@ -265,10 +290,12 @@ function PedirTroca({
   id,
   cacambasLivres,
   freteCidade,
+  valorLocacao,
 }: {
   id: string;
   cacambasLivres: Opcao[];
   freteCidade: number;
+  valorLocacao: number;
 }) {
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(pedirTroca, {});
 
@@ -291,6 +318,15 @@ function PedirTroca({
               </option>
             ))}
           </select>
+          <label className="text-navy-500 flex items-center gap-1">
+            Valor R$
+            <input
+              name="valorLocacao"
+              defaultValue={formatarValor(valorLocacao)}
+              inputMode="decimal"
+              className="border-border-subtle bg-surface text-foreground w-20 rounded-md border px-2 py-1 text-xs"
+            />
+          </label>
           <label className="text-navy-500 flex items-center gap-1">
             Frete R$
             <input
@@ -447,7 +483,12 @@ function AcoesDoStatus(d: DadosAcoes) {
         ) : (
           nota('Aguardando retirada')
         ))}
-      <PedirTroca id={d.id} cacambasLivres={d.cacambasLivres} freteCidade={d.freteCidade} />
+      <PedirTroca
+        id={d.id}
+        cacambasLivres={d.cacambasLivres}
+        freteCidade={d.freteCidade}
+        valorLocacao={d.valorLocacao}
+      />
       {d.status === 'entregue' && (
         <Prorrogar id={d.id} valorLocacao={d.valorLocacao} diasContratados={d.diasContratados} />
       )}

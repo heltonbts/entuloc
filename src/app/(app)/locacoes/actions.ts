@@ -21,6 +21,7 @@ import {
   usuarios,
   vendasMaterial,
 } from '@/db/schema';
+import { formatarBRL } from '@/lib/dinheiro';
 import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
 import { violou } from '@/server/erros';
@@ -28,6 +29,7 @@ import {
   apurarFechamento,
   comandosCobrancaNaEntrega,
   comandosFechamento,
+  jaCobrado,
 } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { apagarFoto } from '@/server/fotos';
@@ -41,6 +43,7 @@ const esquemaCriar = z.object({
   cidadeId: z.uuid('Escolha a cidade'),
   /** Vazio = entrega no endereco do cadastro do cliente. */
   enderecoEntrega: z.string().trim().optional(),
+  valorLocacao: dinheiro.refine((v) => v > 0, 'Informe o valor da locação'),
   valorFrete: dinheiro,
   observacoes: z.string().trim().optional(),
   motoristaId: z.uuid('Escolha o motorista'),
@@ -55,6 +58,7 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
     cacambaId: form.get('cacambaId'),
     cidadeId: form.get('cidadeId'),
     enderecoEntrega: form.get('enderecoEntrega') || undefined,
+    valorLocacao: form.get('valorLocacao'),
     valorFrete: form.get('valorFrete'),
     observacoes: form.get('observacoes') || undefined,
     motoristaId: form.get('motoristaId'),
@@ -111,10 +115,6 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
 
   if (!tipo || !cidade) return { ok: false, erro: 'Tipo ou cidade inválidos.' };
   if (!cidade.ativa) return { ok: false, erro: `${cidade.nome} não está sendo atendida.` };
-  if (tipo.valorLocacao === 0) {
-    return { ok: false, erro: `O valor de "${tipo.nome}" ainda não foi definido.` };
-  }
-
   // Valores congelados agora: reajuste futuro de tabela nao altera esta locacao.
   const [criada] = await db
     .insert(locacoes)
@@ -124,7 +124,9 @@ export async function criarLocacao(_estado: EstadoForm, form: FormData): Promise
       cidadeId: parsed.data.cidadeId,
       enderecoEntrega: parsed.data.enderecoEntrega || cliente.endereco,
       status: 'agendada',
-      valorLocacao: tipo.valorLocacao,
+      // Valor e frete vem preenchidos da tabela, mas podem ser negociados com
+      // o cliente no lancamento (desconto, entrega mais longe).
+      valorLocacao: parsed.data.valorLocacao,
       // O frete da cidade vem preenchido no formulario, mas pode ser ajustado
       // no lancamento (entrega mais longe, desconto combinado).
       valorFrete: parsed.data.valorFrete,
@@ -434,10 +436,16 @@ export async function pedirTroca(_estado: EstadoForm, form: FormData): Promise<E
   const usuario = await exigirPermissao('locacoes.criar');
 
   const parsed = z
-    .object({ id: z.uuid(), cacambaId: z.uuid('Escolha a caçamba vazia'), valorFrete: dinheiro })
+    .object({
+      id: z.uuid(),
+      cacambaId: z.uuid('Escolha a caçamba vazia'),
+      valorLocacao: dinheiro.refine((v) => v > 0, 'Informe o valor da locação'),
+      valorFrete: dinheiro,
+    })
     .safeParse({
       id: form.get('id'),
       cacambaId: form.get('cacambaId'),
+      valorLocacao: form.get('valorLocacao'),
       valorFrete: form.get('valorFrete'),
     });
   if (!parsed.success) return erroDeZod(parsed.error);
@@ -455,9 +463,7 @@ export async function pedirTroca(_estado: EstadoForm, form: FormData): Promise<E
     .from(tiposCacamba)
     .where(eq(tiposCacamba.id, vazia.tipoId))
     .limit(1);
-  if (!tipo || tipo.valorLocacao === 0) {
-    return { ok: false, erro: 'O tipo dessa caçamba está sem valor definido.' };
-  }
+  if (!tipo) return { ok: false, erro: 'Tipo da caçamba inválido.' };
 
   let novaId: string;
   try {
@@ -474,7 +480,7 @@ export async function pedirTroca(_estado: EstadoForm, form: FormData): Promise<E
           motoristaId: cheia.motoristaId,
           regraMultaId: cheia.regraMultaId,
           status: 'agendada',
-          valorLocacao: tipo.valorLocacao,
+          valorLocacao: parsed.data.valorLocacao,
           valorFrete: parsed.data.valorFrete,
           diasContratados: tipo.diasInclusos,
           contagemPrazo: tipo.contagemPrazo,
@@ -546,6 +552,63 @@ export async function prorrogar(_estado: EstadoForm, form: FormData): Promise<Es
       .where(and(eq(locacoes.id, locacao.id), eq(locacoes.status, 'entregue'))),
   ]);
 
+  revalidatePath('/locacoes');
+  revalidatePath('/painel');
+  return { ok: true };
+}
+
+/**
+ * Corrige valor e frete de uma locacao em andamento (preco renegociado com o
+ * cliente). Concluida ja virou cobranca final — ai o ajuste e no Financeiro.
+ */
+export async function alterarValores(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
+  await exigirPermissao('locacoes.criar');
+
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      valorLocacao: dinheiro.refine((v) => v > 0, 'Informe o valor da locação'),
+      valorFrete: dinheiro,
+    })
+    .safeParse({
+      id: form.get('id'),
+      valorLocacao: form.get('valorLocacao'),
+      valorFrete: form.get('valorFrete'),
+    });
+  if (!parsed.success) return erroDeZod(parsed.error);
+
+  const db = getDb();
+  const [locacao] = await db
+    .select({ status: locacoes.status, clienteId: locacoes.clienteId })
+    .from(locacoes)
+    .where(eq(locacoes.id, parsed.data.id))
+    .limit(1);
+  if (!locacao) return { ok: false, erro: 'Locação não encontrada.' };
+  if (!STATUS_ATIVOS.includes(locacao.status)) {
+    return { ok: false, erro: 'Locação encerrada: ajuste o valor pela cobrança no Financeiro.' };
+  }
+
+  // Cliente que paga na entrega pode ja ter sido cobrado: baixar o valor
+  // abaixo disso deixaria cobranca a mais sem ninguem ver. Aumentar e seguro —
+  // a diferenca entra sozinha no fechamento ("cobra o que falta").
+  const cobrado = await jaCobrado(parsed.data.id);
+  if (parsed.data.valorLocacao + parsed.data.valorFrete < cobrado) {
+    return {
+      ok: false,
+      erro: `Já foram cobrados ${formatarBRL(cobrado)} desta locação. Para baixar, ajuste a cobrança no Financeiro.`,
+    };
+  }
+
+  await db
+    .update(locacoes)
+    .set({
+      valorLocacao: parsed.data.valorLocacao,
+      valorFrete: parsed.data.valorFrete,
+      atualizadoEm: new Date(),
+    })
+    .where(eq(locacoes.id, parsed.data.id));
+
+  revalidatePath(`/clientes/${locacao.clienteId}`);
   revalidatePath('/locacoes');
   revalidatePath('/painel');
   return { ok: true };

@@ -88,7 +88,12 @@ export default async function PaginaLocacoes() {
         .from(clientes)
         .orderBy(asc(clientes.nome)),
       db
-        .select({ id: cacambas.id, rotulo: cacambas.numeracao, tipo: tiposCacamba.nome })
+        .select({
+          id: cacambas.id,
+          rotulo: cacambas.numeracao,
+          tipo: tiposCacamba.nome,
+          valor: tiposCacamba.valorLocacao,
+        })
         .from(cacambas)
         .innerJoin(tiposCacamba, eq(cacambas.tipoId, tiposCacamba.id))
         .where(
@@ -129,6 +134,7 @@ export default async function PaginaLocacoes() {
   const cacambasLivres = opcoesCacamba.map((c) => ({
     id: c.id,
     rotulo: `${c.rotulo} — ${c.tipo}`,
+    valor: c.valor,
   }));
 
   return (

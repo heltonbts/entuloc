@@ -16,11 +16,12 @@ import {
   statusCobranca,
   type StatusCobranca,
 } from '@/lib/dominio/financeiro';
-import { hojeEmSaoPaulo } from '@/lib/dominio/locacao';
+import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { podeAcessar } from '@/lib/dominio/tipos';
 import { exigirPermissaoPagina } from '@/server/auth/guarda';
 
 import { FormularioCliente } from '../formulario';
+import { TotalEditavel } from './editar-valores';
 
 export const metadata = { title: 'Cliente' };
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,8 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
         entregaEm: locacoes.entregaEm,
         retiradaEm: locacoes.retiradaEm,
         numeracao: cacambas.numeracao,
+        valorLocacao: locacoes.valorLocacao,
+        valorFrete: locacoes.valorFrete,
         total:
           sql<number>`${locacoes.valorLocacao} + ${locacoes.valorFrete} + coalesce(${locacoes.multaApurada}, 0)
           + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
@@ -95,6 +98,7 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
       : Promise.resolve([]),
   ]);
 
+  const podeEditarValor = podeAcessar(usuario.papel, 'locacoes.criar');
   const hoje = hojeEmSaoPaulo();
   // Um recebimento agregado por cobranca basta para saldo e situacao.
   const itens = contas.map((c) => {
@@ -184,7 +188,13 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
                   {data(l.retiradaEm)}
                 </td>
                 <td className="text-navy-700 px-4 py-3 whitespace-nowrap dark:text-white">
-                  {formatarBRL(l.total)}
+                  <TotalEditavel
+                    id={l.id}
+                    total={l.total}
+                    valorLocacao={l.valorLocacao}
+                    valorFrete={l.valorFrete}
+                    editavel={podeEditarValor && STATUS_ATIVOS.includes(l.status)}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   <Etiqueta>{rotuloLocacao[l.status] ?? l.status}</Etiqueta>
