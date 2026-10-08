@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
+import type { Papel } from '@/lib/dominio/tipos';
 
 import { criarUsuario, redefinirSenha, trocarPapel, type EstadoSenha } from './actions';
 
@@ -51,6 +52,7 @@ export function FormularioUsuario() {
           <Campo label="E-mail (login)" name="email" type="email" erro={estado.campos?.email} />
           <Select label="Papel" name="papel" defaultValue="funcionario">
             <option value="funcionario">Funcionário</option>
+            <option value="motorista">Motorista</option>
             <option value="gestor">Gestor</option>
           </Select>
         </div>
@@ -89,7 +91,7 @@ export function RedefinirSenha({ id }: { id: string }) {
   );
 }
 
-export function SeletorPapel({ id, papel }: { id: string; papel: 'gestor' | 'funcionario' }) {
+export function SeletorPapel({ id, papel }: { id: string; papel: Papel }) {
   return (
     <form action={trocarPapel}>
       <input type="hidden" name="id" value={id} />
@@ -101,6 +103,7 @@ export function SeletorPapel({ id, papel }: { id: string; papel: 'gestor' | 'fun
         className="border-border-subtle bg-surface text-foreground rounded-md border px-2 py-1 text-xs"
       >
         <option value="funcionario">Funcionário</option>
+        <option value="motorista">Motorista</option>
         <option value="gestor">Gestor</option>
       </select>
     </form>

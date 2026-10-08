@@ -1,5 +1,6 @@
 import { asc, count, eq, inArray } from 'drizzle-orm';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { Cartao, Etiqueta, Tabela, TituloSecao, Vazio } from '@/components/ui';
 import { getDb } from '@/db';
@@ -11,6 +12,8 @@ import {
   STATUS_ATIVOS,
   type SituacaoAluguel,
 } from '@/lib/dominio/locacao';
+import { podeAcessar, telaInicial } from '@/lib/dominio/tipos';
+import { exigirSessao } from '@/server/auth/guarda';
 
 function formatarData(data: string | null): string {
   if (!data) return '—';
@@ -60,6 +63,10 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Painel' };
 
 export default async function PaginaPainel({ searchParams }: PageProps<'/painel'>) {
+  // Motorista nao ve a operacao inteira: vai direto para as OS dele.
+  const usuario = await exigirSessao();
+  if (!podeAcessar(usuario.papel, 'locacoes.ver')) redirect(telaInicial(usuario.papel));
+
   const { acesso } = await searchParams;
   const db = getDb();
   const [frota, disponiveis, cidadesAtivas, regrasAtivas, tipos, ativas] = await Promise.all([

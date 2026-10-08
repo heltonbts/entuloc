@@ -152,7 +152,7 @@ export type Locacao = {
  * Acesso
  * ------------------------------------------------------------------ */
 
-export type Papel = 'gestor' | 'funcionario';
+export type Papel = 'gestor' | 'funcionario' | 'motorista';
 
 export type Permissao =
   | 'configuracoes.editar'
@@ -166,6 +166,7 @@ export type Permissao =
   | 'vendas.registrar'
   | 'locacoes.fechar'
   | 'locacoes.apagar'
+  | 'locacoes.corrigirValor'
   | 'frota.editar'
   | 'clientes.editar'
   | 'locacoes.criar'
@@ -173,7 +174,10 @@ export type Permissao =
   | 'coletas.registrar'
   | 'deposito.registrar';
 
-/** O gestor configura e ve dinheiro; o funcionario toca a operacao do dia. */
+/**
+ * O gestor configura e ve dinheiro; o funcionario toca a operacao do dia; o
+ * motorista so ve as OS dele e da baixa (entrega, retirada) pelo celular.
+ */
 export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
   gestor: [
     'configuracoes.editar',
@@ -187,6 +191,7 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'vendas.registrar',
     'locacoes.fechar',
     'locacoes.apagar',
+    'locacoes.corrigirValor',
     'frota.editar',
     'clientes.editar',
     'locacoes.criar',
@@ -203,13 +208,14 @@ export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
     'coletas.registrar',
     'deposito.registrar',
   ],
+  motorista: ['coletas.registrar'],
 } as const;
 
 export function podeAcessar(papel: Papel, permissao: Permissao): boolean {
   return PERMISSOES_POR_PAPEL[papel].includes(permissao);
 }
 
-/** Tela inicial de cada papel: o funcionario trabalha nas OS, o gestor no painel. */
+/** Tela inicial de cada papel: funcionario e motorista trabalham nas OS, o gestor no painel. */
 export function telaInicial(papel: Papel): '/campo' | '/painel' {
-  return papel === 'funcionario' ? '/campo' : '/painel';
+  return papel === 'gestor' ? '/painel' : '/campo';
 }

@@ -99,6 +99,10 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
   ]);
 
   const podeEditarValor = podeAcessar(usuario.papel, 'locacoes.criar');
+  // Gestor corrige qualquer OS, inclusive as encerradas; os demais, so as em andamento.
+  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
+  const valorEditavel = (status: (typeof STATUS_ATIVOS)[number]) =>
+    podeEditarValor && (corrigeTudo ? status !== 'cancelada' : STATUS_ATIVOS.includes(status));
   const hoje = hojeEmSaoPaulo();
   // Um recebimento agregado por cobranca basta para saldo e situacao.
   const itens = contas.map((c) => {
@@ -193,7 +197,7 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
                     total={l.total}
                     valorLocacao={l.valorLocacao}
                     valorFrete={l.valorFrete}
-                    editavel={podeEditarValor && STATUS_ATIVOS.includes(l.status)}
+                    editavel={valorEditavel(l.status)}
                   />
                 </td>
                 <td className="px-4 py-3">

@@ -15,9 +15,11 @@ import {
   usuarios,
 } from '@/db/schema';
 import { formatarBRL } from '@/lib/dinheiro';
+import { STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { podeAcessar } from '@/lib/dominio/tipos';
 import { exigirSessao } from '@/server/auth/guarda';
 
+import { TotalEditavel } from '../clientes/[id]/editar-valores';
 import { AcoesLocacao, FormularioLocacao, TrocarMotorista } from './formulario';
 
 export const metadata = { title: 'Locações' };
@@ -127,6 +129,9 @@ export default async function PaginaLocacoes() {
 
   const podeFechar = podeAcessar(usuario.papel, 'locacoes.fechar');
   const podeApagar = podeAcessar(usuario.papel, 'locacoes.apagar');
+  const podeEditarValor = podeAcessar(usuario.papel, 'locacoes.criar');
+  // Gestor corrige qualquer OS, inclusive as encerradas; os demais, so as em andamento.
+  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
   // Cheias com troca agendada (a OS nova aponta para elas).
   const comTrocaAgendada = new Set(
     lista.filter((l) => l.status === 'agendada' && l.trocaDeId).map((l) => l.trocaDeId),
@@ -219,7 +224,18 @@ export default async function PaginaLocacoes() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="text-navy-700 block font-semibold dark:text-white">
-                      {formatarBRL(total)}
+                      <TotalEditavel
+                        id={l.id}
+                        total={total}
+                        valorLocacao={l.valorLocacao}
+                        valorFrete={l.valorFrete}
+                        editavel={
+                          podeEditarValor &&
+                          (corrigeTudo
+                            ? l.status !== 'cancelada'
+                            : STATUS_ATIVOS.includes(l.status))
+                        }
+                      />
                     </span>
                     {l.prorrogado > 0 && (
                       <span className="text-navy-400 block text-xs">

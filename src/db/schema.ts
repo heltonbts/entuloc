@@ -45,7 +45,7 @@ export const statusLocacaoEnum = pgEnum('status_locacao', [
   'concluida',
   'cancelada',
 ]);
-export const papelEnum = pgEnum('papel', ['gestor', 'funcionario']);
+export const papelEnum = pgEnum('papel', ['gestor', 'funcionario', 'motorista']);
 export const tipoPessoaEnum = pgEnum('tipo_pessoa', ['fisica', 'juridica']);
 export const formaCobrancaEnum = pgEnum('forma_cobranca', ['entrega', 'retirada', 'periodo']);
 export const periodoFaturaEnum = pgEnum('periodo_fatura', ['semanal', 'quinzenal', 'mensal']);

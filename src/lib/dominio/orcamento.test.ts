@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { calcularFechamento, calcularMulta, calcularOrcamento } from './orcamento';
 import type { CidadeAtendida, RegraMulta, TipoCacamba } from './tipos';
-import { podeAcessar, TIPOS_CACAMBA_PADRAO } from './tipos';
+import { podeAcessar, telaInicial, TIPOS_CACAMBA_PADRAO } from './tipos';
 
 const cacamba4m3 = TIPOS_CACAMBA_PADRAO.find((t) => t.id === 'cacamba_4m3') as TipoCacamba;
 
@@ -131,5 +131,20 @@ describe('podeAcessar', () => {
     expect(podeAcessar('funcionario', 'precos.editar')).toBe(false);
     expect(podeAcessar('funcionario', 'multas.editar')).toBe(false);
     expect(podeAcessar('funcionario', 'financeiro.ver')).toBe(false);
+    expect(podeAcessar('funcionario', 'locacoes.corrigirValor')).toBe(false);
+  });
+
+  it('so o gestor corrige o valor de OS encerrada', () => {
+    expect(podeAcessar('gestor', 'locacoes.corrigirValor')).toBe(true);
+  });
+
+  it('motorista so da baixa nas OS dele', () => {
+    expect(podeAcessar('motorista', 'coletas.registrar')).toBe(true);
+    expect(podeAcessar('motorista', 'locacoes.ver')).toBe(false);
+    expect(podeAcessar('motorista', 'locacoes.criar')).toBe(false);
+    expect(podeAcessar('motorista', 'clientes.editar')).toBe(false);
+    expect(podeAcessar('motorista', 'deposito.registrar')).toBe(false);
+    expect(telaInicial('motorista')).toBe('/campo');
+    expect(telaInicial('gestor')).toBe('/painel');
   });
 });

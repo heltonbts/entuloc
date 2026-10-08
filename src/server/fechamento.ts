@@ -1,8 +1,18 @@
-import { and, eq, sum } from 'drizzle-orm';
+import { and, desc, eq, sql, sum } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 
 import { getDb } from '@/db';
-import { clientes, cobrancas, itensFatura, locacoes, prorrogacoes, regrasMulta } from '@/db/schema';
+import { col } from '@/db/sql';
+import {
+  clientes,
+  cobrancas,
+  itensFatura,
+  locacoes,
+  prorrogacoes,
+  recebimentos,
+  regrasMulta,
+} from '@/db/schema';
+import { formatarBRL } from '@/lib/dinheiro';
 import { faltaCobrar } from '@/lib/dominio/faturamento';
 import { calcularMulta } from '@/lib/dominio/orcamento';
 import { calcularDiasAtraso } from '@/lib/dominio/prazo';
@@ -11,7 +21,7 @@ import type { DataISO, RegraMulta } from '@/lib/dominio/tipos';
 type Locacao = typeof locacoes.$inferSelect;
 type Comando = BatchItem<'pg'>;
 
-async function formaDoCliente(clienteId: string) {
+export async function formaDoCliente(clienteId: string) {
   const [c] = await getDb()
     .select({ forma: clientes.formaCobranca })
     .from(clientes)
@@ -151,4 +161,116 @@ export function comandosFechamento(
       vencimentoEm: retiradaEm,
     }),
   ];
+}
+
+const recebidoDa = sql<number>`(select coalesce(sum(${recebimentos.valor}), 0) from ${recebimentos}
+  where ${col(recebimentos.cobrancaId)} = ${col(cobrancas.id)})`.mapWith(Number);
+
+/**
+ * Comandos que acompanham a correcao do valor de uma locacao (so o gestor),
+ * para o Financeiro continuar batendo com a OS:
+ * - valor subiu numa locacao ja encerrada e cobrada: cobranca de ajuste com a
+ *   diferenca (locacao em andamento cobra a diferenca sozinha no fechamento);
+ * - valor caiu abaixo do que ja foi cobrado: abate das cobrancas em aberto,
+ *   das mais novas para as mais antigas. O que ja foi recebido nao se mexe —
+ *   devolver dinheiro e acerto manual com o cliente.
+ */
+export async function comandosCorrecaoValor(
+  locacao: Locacao,
+  novoTotal: number,
+  hoje: DataISO,
+): Promise<{ comandos: Comando[] } | { erro: string }> {
+  const db = getDb();
+  const cobrado = await jaCobrado(locacao.id);
+
+  if (novoTotal > cobrado) {
+    if (locacao.status !== 'concluida' || cobrado === 0) return { comandos: [] };
+    const [faturada] = await db
+      .select({ id: itensFatura.id })
+      .from(itensFatura)
+      .where(eq(itensFatura.locacaoId, locacao.id))
+      .limit(1);
+    // Cliente de fatura ainda nao faturado: a fatura pendente ja le o valor novo.
+    if (!faturada && (await formaDoCliente(locacao.clienteId)) === 'periodo') {
+      return { comandos: [] };
+    }
+    return {
+      comandos: [
+        db.insert(cobrancas).values({
+          clienteId: locacao.clienteId,
+          origem: 'locacao',
+          locacaoId: locacao.id,
+          descricao: `Ajuste de valor — OS ${locacao.numeroOs}`,
+          valorTotal: novoTotal - cobrado,
+          vencimentoEm: hoje,
+        }),
+      ],
+    };
+  }
+
+  let restante = cobrado - novoTotal;
+  if (restante === 0) return { comandos: [] };
+
+  const [diretas, [item]] = await Promise.all([
+    db
+      .select({ id: cobrancas.id, valor: cobrancas.valorTotal, recebido: recebidoDa })
+      .from(cobrancas)
+      .where(and(eq(cobrancas.locacaoId, locacao.id), eq(cobrancas.cancelada, false)))
+      .orderBy(desc(cobrancas.criadoEm)),
+    db
+      .select({
+        id: itensFatura.id,
+        valor: itensFatura.valor,
+        faturaId: cobrancas.id,
+        faturaValor: cobrancas.valorTotal,
+        recebido: recebidoDa,
+      })
+      .from(itensFatura)
+      .innerJoin(cobrancas, eq(itensFatura.cobrancaId, cobrancas.id))
+      .where(and(eq(itensFatura.locacaoId, locacao.id), eq(cobrancas.cancelada, false)))
+      .limit(1),
+  ]);
+
+  const comandos: Comando[] = [];
+  // Cobranca zerada vira cancelada: o banco nao aceita cobranca de valor 0.
+  const baixar = (id: string, valor: number, abate: number) =>
+    db
+      .update(cobrancas)
+      .set(
+        valor === abate
+          ? { cancelada: true, atualizadoEm: new Date() }
+          : { valorTotal: valor - abate, atualizadoEm: new Date() },
+      )
+      .where(eq(cobrancas.id, id));
+
+  for (const c of diretas) {
+    const abate = Math.min(restante, c.valor - c.recebido);
+    if (abate <= 0) continue;
+    comandos.push(baixar(c.id, c.valor, abate));
+    restante -= abate;
+    if (restante === 0) break;
+  }
+
+  if (restante > 0 && item) {
+    const abate = Math.min(restante, item.valor, item.faturaValor - item.recebido);
+    if (abate > 0) {
+      comandos.push(
+        abate === item.valor
+          ? db.delete(itensFatura).where(eq(itensFatura.id, item.id))
+          : db
+              .update(itensFatura)
+              .set({ valor: item.valor - abate })
+              .where(eq(itensFatura.id, item.id)),
+        baixar(item.faturaId, item.faturaValor, abate),
+      );
+      restante -= abate;
+    }
+  }
+
+  if (restante > 0) {
+    return {
+      erro: `Já foram recebidos pagamentos desta locação: o valor só pode baixar até ${formatarBRL(novoTotal + restante)}.`,
+    };
+  }
+  return { comandos };
 }

@@ -45,8 +45,8 @@ export default async function PaginaUsuarios() {
           Usuários
         </h1>
         <p className="text-navy-500 dark:text-navy-200 mt-1 text-sm">
-          Funcionários recebem as OS no celular em “Minhas OS”. Gestores configuram preços e veem o
-          financeiro.
+          Funcionários tocam a operação e recebem as OS no celular em “Minhas OS”. Motoristas só
+          veem as OS deles e dão baixa. Gestores configuram preços e veem o financeiro.
         </p>
       </div>
 

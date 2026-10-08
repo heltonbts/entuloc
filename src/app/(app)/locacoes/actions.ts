@@ -24,12 +24,15 @@ import {
 import { formatarBRL } from '@/lib/dinheiro';
 import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
 import { calcularVencimento } from '@/lib/dominio/prazo';
+import { podeAcessar } from '@/lib/dominio/tipos';
 import { violou } from '@/server/erros';
 import {
   apurarFechamento,
   comandosCobrancaNaEntrega,
+  comandosCorrecaoValor,
   comandosFechamento,
   jaCobrado,
+  somaProrrogacoes,
 } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { apagarFoto } from '@/server/fotos';
@@ -558,11 +561,13 @@ export async function prorrogar(_estado: EstadoForm, form: FormData): Promise<Es
 }
 
 /**
- * Corrige valor e frete de uma locacao em andamento (preco renegociado com o
- * cliente). Concluida ja virou cobranca final — ai o ajuste e no Financeiro.
+ * Corrige valor e frete de uma locacao (preco renegociado com o cliente).
+ * Funcionario corrige so locacao em andamento e sem baixar do ja cobrado; o
+ * gestor corrige qualquer OS, nova ou antiga, e o Financeiro acompanha.
  */
 export async function alterarValores(_estado: EstadoForm, form: FormData): Promise<EstadoForm> {
-  await exigirPermissao('locacoes.criar');
+  const usuario = await exigirPermissao('locacoes.criar');
+  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
 
   const parsed = z
     .object({
@@ -576,40 +581,54 @@ export async function alterarValores(_estado: EstadoForm, form: FormData): Promi
       valorFrete: form.get('valorFrete'),
     });
   if (!parsed.success) return erroDeZod(parsed.error);
+  const { valorLocacao, valorFrete } = parsed.data;
 
   const db = getDb();
   const [locacao] = await db
-    .select({ status: locacoes.status, clienteId: locacoes.clienteId })
+    .select()
     .from(locacoes)
     .where(eq(locacoes.id, parsed.data.id))
     .limit(1);
   if (!locacao) return { ok: false, erro: 'Locação não encontrada.' };
-  if (!STATUS_ATIVOS.includes(locacao.status)) {
-    return { ok: false, erro: 'Locação encerrada: ajuste o valor pela cobrança no Financeiro.' };
+  if (locacao.status === 'cancelada') {
+    return { ok: false, erro: 'Locação cancelada não tem valor a corrigir.' };
+  }
+  if (!corrigeTudo && !STATUS_ATIVOS.includes(locacao.status)) {
+    return { ok: false, erro: 'Locação encerrada: só o gestor corrige o valor.' };
   }
 
-  // Cliente que paga na entrega pode ja ter sido cobrado: baixar o valor
-  // abaixo disso deixaria cobranca a mais sem ninguem ver. Aumentar e seguro —
-  // a diferenca entra sozinha no fechamento ("cobra o que falta").
-  const cobrado = await jaCobrado(parsed.data.id);
-  if (parsed.data.valorLocacao + parsed.data.valorFrete < cobrado) {
-    return {
-      ok: false,
-      erro: `Já foram cobrados ${formatarBRL(cobrado)} desta locação. Para baixar, ajuste a cobrança no Financeiro.`,
-    };
+  const novoTotal =
+    valorLocacao + valorFrete + (await somaProrrogacoes(locacao.id)) + (locacao.multaApurada ?? 0);
+
+  let financeiro: Awaited<ReturnType<typeof comandosCorrecaoValor>> = { comandos: [] };
+  if (corrigeTudo) {
+    financeiro = await comandosCorrecaoValor(locacao, novoTotal, hojeEmSaoPaulo());
+    if ('erro' in financeiro) return { ok: false, erro: financeiro.erro };
+  } else {
+    // Cliente que paga na entrega pode ja ter sido cobrado: baixar abaixo
+    // disso mexe no Financeiro, entao fica com o gestor. Aumentar e seguro —
+    // a diferenca entra sozinha no fechamento ("cobra o que falta").
+    const cobrado = await jaCobrado(locacao.id);
+    if (novoTotal < cobrado) {
+      return {
+        ok: false,
+        erro: `Já foram cobrados ${formatarBRL(cobrado)} desta locação. Para baixar, fale com o gestor.`,
+      };
+    }
   }
 
-  await db
-    .update(locacoes)
-    .set({
-      valorLocacao: parsed.data.valorLocacao,
-      valorFrete: parsed.data.valorFrete,
-      atualizadoEm: new Date(),
-    })
-    .where(eq(locacoes.id, parsed.data.id));
+  await db.batch([
+    db
+      .update(locacoes)
+      .set({ valorLocacao, valorFrete, atualizadoEm: new Date() })
+      .where(eq(locacoes.id, locacao.id)),
+    ...financeiro.comandos,
+  ]);
 
   revalidatePath(`/clientes/${locacao.clienteId}`);
+  revalidatePath(`/os/${locacao.id}`);
   revalidatePath('/locacoes');
+  revalidatePath('/financeiro');
   revalidatePath('/painel');
   return { ok: true };
 }

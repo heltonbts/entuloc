@@ -16,7 +16,7 @@ import { erroDeZod, textoObrigatorio, type EstadoForm } from '@/server/validacao
 /** Resultado que carrega a senha provisoria para mostrar UMA vez na tela. */
 export type EstadoSenha = EstadoForm & { senha?: string; para?: string };
 
-const papel = z.enum(['gestor', 'funcionario']);
+const papel = z.enum(['gestor', 'funcionario', 'motorista']);
 
 const esquemaNovo = z.object({
   nome: textoObrigatorio('Nome'),

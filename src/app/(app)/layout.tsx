@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Logo } from '@/components/brand/logo';
-import { podeAcessar, type Permissao } from '@/lib/dominio/tipos';
+import { podeAcessar, telaInicial, type Permissao } from '@/lib/dominio/tipos';
 import { sair } from '@/server/auth/actions';
 import { exigirSessao } from '@/server/auth/guarda';
 
 const navegacao: { href: string; rotulo: string; exige?: Permissao }[] = [
   { href: '/campo', rotulo: 'Minhas OS', exige: 'coletas.registrar' },
-  { href: '/painel', rotulo: 'Painel' },
+  { href: '/painel', rotulo: 'Painel', exige: 'locacoes.ver' },
   { href: '/locacoes', rotulo: 'Locações', exige: 'locacoes.ver' },
   { href: '/clientes', rotulo: 'Clientes', exige: 'clientes.editar' },
   { href: '/deposito', rotulo: 'Depósito', exige: 'deposito.registrar' },
@@ -33,7 +33,10 @@ export default async function LayoutApp({ children }: LayoutProps<'/'>) {
     <div className="flex min-h-full flex-col">
       <header className="border-border-subtle bg-surface sticky top-0 z-10 border-b">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-6">
-          <Link href="/painel" className="focus-visible:outline-brand-600 rounded">
+          <Link
+            href={telaInicial(usuario.papel)}
+            className="focus-visible:outline-brand-600 rounded"
+          >
             <Logo size="sm" />
           </Link>
           <div className="flex items-center gap-4">

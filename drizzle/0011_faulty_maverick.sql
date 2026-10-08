@@ -1,0 +1,1 @@
+ALTER TYPE "public"."papel" ADD VALUE 'motorista';
