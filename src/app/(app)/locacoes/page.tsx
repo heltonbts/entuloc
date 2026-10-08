@@ -47,7 +47,8 @@ export default async function PaginaLocacoes() {
   const usuario = await exigirSessao();
   const db = getDb();
 
-  const [lista, opcoesCliente, opcoesCacamba, opcoesCidade, opcoesRegra, motoristas] =
+  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
+  const [lista, opcoesCliente, opcoesCacamba, opcoesCidade, opcoesRegra, motoristas, extras] =
     await Promise.all([
       db
         .select({
@@ -57,7 +58,6 @@ export default async function PaginaLocacoes() {
           motoristaId: locacoes.motoristaId,
           motivoCancelamento: locacoes.motivoCancelamento,
           trocaDeId: locacoes.trocaDeId,
-          diasContratados: locacoes.diasContratados,
           freteCidade: cidades.valorFrete,
           prorrogado:
             sql<number>`(select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
@@ -125,13 +125,23 @@ export default async function PaginaLocacoes() {
         .from(usuarios)
         .where(eq(usuarios.ativo, true))
         .orderBy(asc(usuarios.nome)),
+      corrigeTudo
+        ? db
+            .select({
+              id: prorrogacoes.id,
+              locacaoId: prorrogacoes.locacaoId,
+              dias: prorrogacoes.dias,
+              valor: prorrogacoes.valor,
+            })
+            .from(prorrogacoes)
+            .orderBy(prorrogacoes.criadoEm)
+        : Promise.resolve([]),
     ]);
 
   const podeFechar = podeAcessar(usuario.papel, 'locacoes.fechar');
   const podeApagar = podeAcessar(usuario.papel, 'locacoes.apagar');
   const podeEditarValor = podeAcessar(usuario.papel, 'locacoes.criar');
   // Gestor corrige qualquer OS, inclusive as encerradas; os demais, so as em andamento.
-  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
   // Cheias com troca agendada (a OS nova aponta para elas).
   const comTrocaAgendada = new Set(
     lista.filter((l) => l.status === 'agendada' && l.trocaDeId).map((l) => l.trocaDeId),
@@ -235,6 +245,14 @@ export default async function PaginaLocacoes() {
                             ? l.status !== 'cancelada'
                             : STATUS_ATIVOS.includes(l.status))
                         }
+                        extras={
+                          corrigeTudo
+                            ? {
+                                multa: l.multaApurada,
+                                prorrogacoes: extras.filter((p) => p.locacaoId === l.id),
+                              }
+                            : undefined
+                        }
                       />
                     </span>
                     {l.prorrogado > 0 && (
@@ -274,7 +292,6 @@ export default async function PaginaLocacoes() {
                       ehTroca={l.trocaDeId !== null}
                       trocaAgendada={comTrocaAgendada.has(l.id)}
                       valorLocacao={l.valorLocacao}
-                      diasContratados={l.diasContratados}
                       freteCidade={l.freteCidade}
                       cacambasLivres={cacambasLivres}
                     />

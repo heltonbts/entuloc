@@ -58,7 +58,8 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, id)).limit(1);
   if (!cliente) notFound();
 
-  const [historico, contas] = await Promise.all([
+  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
+  const [historico, contas, extrasProrrogacao] = await Promise.all([
     db
       .select({
         id: locacoes.id,
@@ -70,6 +71,7 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
         numeracao: cacambas.numeracao,
         valorLocacao: locacoes.valorLocacao,
         valorFrete: locacoes.valorFrete,
+        multaApurada: locacoes.multaApurada,
         total:
           sql<number>`${locacoes.valorLocacao} + ${locacoes.valorFrete} + coalesce(${locacoes.multaApurada}, 0)
           + (select coalesce(sum(${prorrogacoes.valor}), 0) from ${prorrogacoes} where ${col(prorrogacoes.locacaoId)} = ${col(locacoes.id)})`.mapWith(
@@ -96,11 +98,23 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
           .where(eq(cobrancas.clienteId, id))
           .orderBy(desc(cobrancas.vencimentoEm))
       : Promise.resolve([]),
+    corrigeTudo
+      ? db
+          .select({
+            id: prorrogacoes.id,
+            locacaoId: prorrogacoes.locacaoId,
+            dias: prorrogacoes.dias,
+            valor: prorrogacoes.valor,
+          })
+          .from(prorrogacoes)
+          .innerJoin(locacoes, eq(prorrogacoes.locacaoId, locacoes.id))
+          .where(eq(locacoes.clienteId, id))
+          .orderBy(prorrogacoes.criadoEm)
+      : Promise.resolve([]),
   ]);
 
   const podeEditarValor = podeAcessar(usuario.papel, 'locacoes.criar');
   // Gestor corrige qualquer OS, inclusive as encerradas; os demais, so as em andamento.
-  const corrigeTudo = podeAcessar(usuario.papel, 'locacoes.corrigirValor');
   const valorEditavel = (status: (typeof STATUS_ATIVOS)[number]) =>
     podeEditarValor && (corrigeTudo ? status !== 'cancelada' : STATUS_ATIVOS.includes(status));
   const hoje = hojeEmSaoPaulo();
@@ -198,6 +212,14 @@ export default async function PaginaCliente({ params }: PageProps<'/clientes/[id
                     valorLocacao={l.valorLocacao}
                     valorFrete={l.valorFrete}
                     editavel={valorEditavel(l.status)}
+                    extras={
+                      corrigeTudo
+                        ? {
+                            multa: l.multaApurada,
+                            prorrogacoes: extrasProrrogacao.filter((p) => p.locacaoId === l.id),
+                          }
+                        : undefined
+                    }
                   />
                 </td>
                 <td className="px-4 py-3">

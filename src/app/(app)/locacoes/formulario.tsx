@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 
 import { Botao, Campo, Select } from '@/components/ui';
 import { formatarBRL, formatarValor } from '@/lib/dinheiro';
-import { hojeEmSaoPaulo, valorProrrogacaoSugerido } from '@/lib/dominio/locacao';
+import { hojeEmSaoPaulo, VALOR_PRORROGACAO_PADRAO } from '@/lib/dominio/locacao';
 import type { EstadoForm } from '@/server/validacao';
 
 import {
@@ -350,20 +350,8 @@ function PedirTroca({
   );
 }
 
-function Prorrogar({
-  id,
-  valorLocacao,
-  diasContratados,
-}: {
-  id: string;
-  valorLocacao: number;
-  diasContratados: number;
-}) {
+function Prorrogar({ id }: { id: string }) {
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(prorrogar, {});
-  const [dias, setDias] = useState('1');
-  const [valor, setValor] = useState(() =>
-    formatarValor(valorProrrogacaoSugerido(valorLocacao, diasContratados, 1)),
-  );
 
   return (
     <details className="text-xs">
@@ -376,15 +364,7 @@ function Prorrogar({
             name="dias"
             type="number"
             min={1}
-            value={dias}
-            onChange={(e) => {
-              setDias(e.target.value);
-              const n = Number(e.target.value);
-              // Sugere o proporcional; quem digitar outro valor depois mantem o dele.
-              if (Number.isInteger(n) && n > 0) {
-                setValor(formatarValor(valorProrrogacaoSugerido(valorLocacao, diasContratados, n)));
-              }
-            }}
+            defaultValue={1}
             className="border-border-subtle bg-surface text-foreground w-14 rounded-md border px-2 py-1 text-xs"
           />
         </label>
@@ -392,8 +372,7 @@ function Prorrogar({
           Valor R$
           <input
             name="valor"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            defaultValue={formatarValor(VALOR_PRORROGACAO_PADRAO)}
             inputMode="decimal"
             className="border-border-subtle bg-surface text-foreground w-20 rounded-md border px-2 py-1 text-xs"
           />
@@ -422,7 +401,6 @@ export type DadosAcoes = {
   /** Esta locacao (cheia) ja tem uma troca agendada. */
   trocaAgendada: boolean;
   valorLocacao: number;
-  diasContratados: number;
   freteCidade: number;
   cacambasLivres: Opcao[];
 };
@@ -489,9 +467,7 @@ function AcoesDoStatus(d: DadosAcoes) {
         freteCidade={d.freteCidade}
         valorLocacao={d.valorLocacao}
       />
-      {d.status === 'entregue' && (
-        <Prorrogar id={d.id} valorLocacao={d.valorLocacao} diasContratados={d.diasContratados} />
-      )}
+      {d.status === 'entregue' && <Prorrogar id={d.id} />}
     </div>
   );
 }

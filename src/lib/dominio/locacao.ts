@@ -81,17 +81,8 @@ export function proximaEtapa(locacao: {
   return null;
 }
 
-/**
- * Valor sugerido para dias a mais: proporcional ao valor e ao prazo originais
- * (R$ 500 por 5 dias -> R$ 100 por dia extra). O escritorio pode ajustar.
- */
-export function valorProrrogacaoSugerido(
-  valorLocacao: number,
-  diasContratados: number,
-  diasExtras: number,
-): number {
-  return Math.round((valorLocacao * diasExtras) / diasContratados);
-}
+/** Valor padrao de uma prorrogacao (R$ 50), editavel no lancamento. */
+export const VALOR_PRORROGACAO_PADRAO = 5_000;
 
 /** Folga para relogio de celular levemente adiantado. */
 const TOLERANCIA_FUTURO_MS = 5 * 60 * 1000;

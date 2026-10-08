@@ -11,19 +11,29 @@ import { alterarValores } from '../../locacoes/actions';
 const estiloInput =
   'border-border-subtle bg-surface text-foreground w-24 rounded-md border px-2 py-1 text-xs';
 
-/** Total da locacao; enquanto ela esta em andamento, abre para corrigir valor e frete. */
+export type ExtrasLocacao = {
+  multa: number | null;
+  prorrogacoes: { id: string; dias: number; valor: number }[];
+};
+
+/**
+ * Total da locacao, que abre para corrigir valor e frete. Com `extras` (so o
+ * gestor), tambem corrige a multa e exclui prorrogacoes lancadas por engano.
+ */
 export function TotalEditavel({
   id,
   total,
   valorLocacao,
   valorFrete,
   editavel,
+  extras,
 }: {
   id: string;
   total: number;
   valorLocacao: number;
   valorFrete: number;
   editavel: boolean;
+  extras?: ExtrasLocacao;
 }) {
   const [estado, acao, enviando] = useActionState<EstadoForm, FormData>(alterarValores, {});
 
@@ -57,6 +67,34 @@ export function TotalEditavel({
             className={estiloInput}
           />
         </label>
+        {extras && extras.multa !== null && (
+          <label className="text-navy-500 flex items-center justify-between gap-2">
+            Multa R$
+            <input
+              name="multa"
+              defaultValue={formatarValor(extras.multa)}
+              inputMode="decimal"
+              className={estiloInput}
+            />
+          </label>
+        )}
+        {extras?.prorrogacoes.map((p) => (
+          <div key={p.id} className="flex flex-col gap-1">
+            <label className="text-navy-500 flex items-center justify-between gap-2">
+              Prorrogação {p.dias} dia(s) R$
+              <input
+                name={`prorrogacao:${p.id}`}
+                defaultValue={formatarValor(p.valor)}
+                inputMode="decimal"
+                className={estiloInput}
+              />
+            </label>
+            <label className="text-navy-500 flex items-center gap-2">
+              <input type="checkbox" name="removerProrrogacao" value={p.id} />
+              Excluir esta prorrogação
+            </label>
+          </div>
+        ))}
         <Botao type="submit" disabled={enviando} className="px-3 py-1 text-xs">
           {enviando ? 'Salvando…' : 'Salvar valor'}
         </Botao>

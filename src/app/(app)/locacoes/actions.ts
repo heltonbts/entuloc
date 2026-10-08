@@ -32,7 +32,6 @@ import {
   comandosCorrecaoValor,
   comandosFechamento,
   jaCobrado,
-  somaProrrogacoes,
 } from '@/server/fechamento';
 import { exigirPermissao } from '@/server/auth/guarda';
 import { apagarFoto } from '@/server/fotos';
@@ -574,14 +573,19 @@ export async function alterarValores(_estado: EstadoForm, form: FormData): Promi
       id: z.uuid(),
       valorLocacao: dinheiro.refine((v) => v > 0, 'Informe o valor da locação'),
       valorFrete: dinheiro,
+      /** So o gestor: multa apurada (zerar = excluir) e prorrogacoes a excluir. */
+      multa: dinheiro.optional(),
+      removerProrrogacoes: z.array(z.uuid()),
     })
     .safeParse({
       id: form.get('id'),
       valorLocacao: form.get('valorLocacao'),
       valorFrete: form.get('valorFrete'),
+      multa: form.get('multa') ?? undefined,
+      removerProrrogacoes: form.getAll('removerProrrogacao'),
     });
   if (!parsed.success) return erroDeZod(parsed.error);
-  const { valorLocacao, valorFrete } = parsed.data;
+  const { valorLocacao, valorFrete, multa, removerProrrogacoes } = parsed.data;
 
   const db = getDb();
   const [locacao] = await db
@@ -596,9 +600,33 @@ export async function alterarValores(_estado: EstadoForm, form: FormData): Promi
   if (!corrigeTudo && !STATUS_ATIVOS.includes(locacao.status)) {
     return { ok: false, erro: 'Locação encerrada: só o gestor corrige o valor.' };
   }
+  // Valor novo de cada prorrogacao, enviado como `prorrogacao:<id>`.
+  const valoresProrrogacao = new Map<string, number>();
+  for (const [campo, valor] of form.entries()) {
+    if (!campo.startsWith('prorrogacao:')) continue;
+    const lido = dinheiro.safeParse(valor);
+    if (!lido.success) return { ok: false, erro: 'Valor de prorrogação inválido.' };
+    valoresProrrogacao.set(campo.slice('prorrogacao:'.length), lido.data);
+  }
+  if (
+    !corrigeTudo &&
+    (multa !== undefined || removerProrrogacoes.length > 0 || valoresProrrogacao.size > 0)
+  ) {
+    return { ok: false, erro: 'Só o gestor corrige multa ou prorrogação.' };
+  }
 
+  // Multa so existe depois do fechamento; antes disso nao ha o que corrigir.
+  const novaMulta = locacao.multaApurada === null ? null : (multa ?? locacao.multaApurada);
+  const ficam = (
+    await db
+      .select({ id: prorrogacoes.id, dias: prorrogacoes.dias, valor: prorrogacoes.valor })
+      .from(prorrogacoes)
+      .where(eq(prorrogacoes.locacaoId, locacao.id))
+  )
+    .filter((p) => !removerProrrogacoes.includes(p.id))
+    .map((p) => ({ ...p, valorAntes: p.valor, valor: valoresProrrogacao.get(p.id) ?? p.valor }));
   const novoTotal =
-    valorLocacao + valorFrete + (await somaProrrogacoes(locacao.id)) + (locacao.multaApurada ?? 0);
+    valorLocacao + valorFrete + ficam.reduce((s, p) => s + p.valor, 0) + (novaMulta ?? 0);
 
   let financeiro: Awaited<ReturnType<typeof comandosCorrecaoValor>> = { comandos: [] };
   if (corrigeTudo) {
@@ -617,11 +645,42 @@ export async function alterarValores(_estado: EstadoForm, form: FormData): Promi
     }
   }
 
+  // Prorrogacao excluida devolve os dias: o vencimento volta junto.
+  const vencimentoEm =
+    removerProrrogacoes.length > 0 && locacao.entregaEm
+      ? calcularVencimento(
+          locacao.entregaEm,
+          locacao.diasContratados + ficam.reduce((s, p) => s + p.dias, 0),
+          locacao.contagemPrazo,
+        )
+      : locacao.vencimentoEm;
+
   await db.batch([
     db
       .update(locacoes)
-      .set({ valorLocacao, valorFrete, atualizadoEm: new Date() })
+      .set({
+        valorLocacao,
+        valorFrete,
+        multaApurada: novaMulta,
+        vencimentoEm,
+        atualizadoEm: new Date(),
+      })
       .where(eq(locacoes.id, locacao.id)),
+    ...(removerProrrogacoes.length > 0
+      ? [
+          db
+            .delete(prorrogacoes)
+            .where(
+              and(
+                eq(prorrogacoes.locacaoId, locacao.id),
+                inArray(prorrogacoes.id, removerProrrogacoes),
+              ),
+            ),
+        ]
+      : []),
+    ...ficam
+      .filter((p) => p.valor !== p.valorAntes)
+      .map((p) => db.update(prorrogacoes).set({ valor: p.valor }).where(eq(prorrogacoes.id, p.id))),
     ...financeiro.comandos,
   ]);
 

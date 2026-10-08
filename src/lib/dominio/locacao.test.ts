@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  hojeEmSaoPaulo,
-  momentoDoRegistro,
-  proximaEtapa,
-  situacaoAluguel,
-  valorProrrogacaoSugerido,
-} from './locacao';
+import { hojeEmSaoPaulo, momentoDoRegistro, proximaEtapa, situacaoAluguel } from './locacao';
 
 const base = {
   status: 'entregue' as const,
@@ -97,17 +91,6 @@ describe('proximaEtapa', () => {
 
   it('cancelada, nada a fazer', () => {
     expect(proximaEtapa({ ...os, status: 'cancelada' })).toBeNull();
-  });
-});
-
-describe('valorProrrogacaoSugerido', () => {
-  it('proporcional ao valor por dia', () => {
-    expect(valorProrrogacaoSugerido(50_000, 5, 1)).toBe(10_000);
-    expect(valorProrrogacaoSugerido(50_000, 5, 3)).toBe(30_000);
-  });
-
-  it('arredonda para o centavo', () => {
-    expect(valorProrrogacaoSugerido(10_000, 3, 1)).toBe(3_333);
   });
 });
 

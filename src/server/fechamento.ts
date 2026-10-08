@@ -169,8 +169,10 @@ const recebidoDa = sql<number>`(select coalesce(sum(${recebimentos.valor}), 0) f
 /**
  * Comandos que acompanham a correcao do valor de uma locacao (so o gestor),
  * para o Financeiro continuar batendo com a OS:
- * - valor subiu numa locacao ja encerrada e cobrada: cobranca de ajuste com a
- *   diferenca (locacao em andamento cobra a diferenca sozinha no fechamento);
+ * - valor subiu numa locacao ja encerrada e cobrada: a diferenca entra na
+ *   cobranca em aberto da OS, com o vencimento dela (atrasada continua
+ *   vencida); so vira cobranca de ajuste se nao houver nenhuma em aberto.
+ *   Locacao em andamento cobra a diferenca sozinha no fechamento;
  * - valor caiu abaixo do que ja foi cobrado: abate das cobrancas em aberto,
  *   das mais novas para as mais antigas. O que ja foi recebido nao se mexe —
  *   devolver dinheiro e acerto manual com o cliente.
@@ -193,6 +195,22 @@ export async function comandosCorrecaoValor(
     // Cliente de fatura ainda nao faturado: a fatura pendente ja le o valor novo.
     if (!faturada && (await formaDoCliente(locacao.clienteId)) === 'periodo') {
       return { comandos: [] };
+    }
+    const [aberta] = await db
+      .select({ id: cobrancas.id, valor: cobrancas.valorTotal, recebido: recebidoDa })
+      .from(cobrancas)
+      .where(and(eq(cobrancas.locacaoId, locacao.id), eq(cobrancas.cancelada, false)))
+      .orderBy(desc(cobrancas.criadoEm))
+      .limit(1);
+    if (aberta && aberta.recebido < aberta.valor) {
+      return {
+        comandos: [
+          db
+            .update(cobrancas)
+            .set({ valorTotal: aberta.valor + novoTotal - cobrado, atualizadoEm: new Date() })
+            .where(eq(cobrancas.id, aberta.id)),
+        ],
+      };
     }
     return {
       comandos: [
