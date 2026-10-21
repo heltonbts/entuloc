@@ -6,8 +6,10 @@ import { del, get, put } from '@vercel/blob';
  * que exige login.
  */
 
-/** O celular reduz a foto antes de enviar; isto e so a trava do servidor. */
+/** O celular reduz a foto (e converte para WebP) antes de enviar; isto e so a trava do servidor. */
 export const TAMANHO_MAXIMO_FOTO = 4 * 1024 * 1024;
+
+const EXTENSAO_POR_TIPO: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png' };
 
 export function validarFoto(foto: FormDataEntryValue | null): string | null {
   if (!(foto instanceof File) || foto.size === 0) return 'Tire a foto antes de confirmar.';
@@ -17,7 +19,7 @@ export function validarFoto(foto: FormDataEntryValue | null): string | null {
 }
 
 export async function salvarFoto(pasta: string, foto: File): Promise<string> {
-  const extensao = foto.type === 'image/png' ? 'png' : 'jpg';
+  const extensao = EXTENSAO_POR_TIPO[foto.type] ?? 'jpg';
   const blob = await put(`${pasta}/${Date.now()}.${extensao}`, foto, {
     access: 'private',
     contentType: foto.type,

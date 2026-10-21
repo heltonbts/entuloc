@@ -84,6 +84,11 @@ function aplicarFila(lista: OsCampo[], fila: ItemFila[]): OsCampo[] {
 /** Lado maior da foto enviada: nitida para comprovar, leve para subir no 4G. */
 const LADO_MAXIMO = 1600;
 
+/** Navegador que nao gera o formato devolve PNG (bem mais pesado): por isso confere o tipo. */
+function gerarImagem(canvas: HTMLCanvasElement, tipo: string): Promise<Blob | null> {
+  return new Promise((ok) => canvas.toBlob((b) => ok(b?.type === tipo ? b : null), tipo, 0.8));
+}
+
 async function reduzirFoto(original: File): Promise<Blob> {
   try {
     const imagem = await createImageBitmap(original);
@@ -93,7 +98,10 @@ async function reduzirFoto(original: File): Promise<Blob> {
     canvas.height = Math.round(imagem.height * escala);
     canvas.getContext('2d')!.drawImage(imagem, 0, 0, canvas.width, canvas.height);
     imagem.close();
-    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', 0.8));
+    // WebP pesa bem menos que JPEG na mesma nitidez; quem nao gera WebP
+    // (o Safari do iPhone) fica no JPEG.
+    const blob =
+      (await gerarImagem(canvas, 'image/webp')) ?? (await gerarImagem(canvas, 'image/jpeg'));
     return blob ?? original;
   } catch {
     // Formato que o navegador nao decodifica: manda a original (o servidor limita o tamanho).

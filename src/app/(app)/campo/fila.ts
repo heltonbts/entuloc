@@ -74,6 +74,8 @@ async function marcarErro(item: ItemFila, erro: string): Promise<void> {
 
 export type ResultadoEnvio = 'enviado' | 'sem_sinal' | 'sessao_expirada';
 
+const extensao = (foto: Blob) => (foto.type === 'image/webp' ? 'webp' : 'jpg');
+
 /**
  * Envia a fila na ordem. Para no primeiro sem-sinal (o resto tambem falharia)
  * e na sessao expirada (precisa logar de novo; a fila fica guardada).
@@ -86,8 +88,10 @@ export async function enviarFila(usuarioId: string): Promise<ResultadoEnvio> {
     dados.set('id', item.id);
     dados.set('etapa', item.etapa);
     dados.set('capturadoEm', item.capturadoEm);
-    dados.set('foto', item.foto, 'foto.jpg');
-    if (item.fotoRetirada) dados.set('fotoRetirada', item.fotoRetirada, 'recolhida.jpg');
+    dados.set('foto', item.foto, `foto.${extensao(item.foto)}`);
+    if (item.fotoRetirada) {
+      dados.set('fotoRetirada', item.fotoRetirada, `recolhida.${extensao(item.fotoRetirada)}`);
+    }
     if (item.destino) dados.set('destino', item.destino);
     if (item.latitude !== undefined) dados.set('latitude', String(item.latitude));
     if (item.longitude !== undefined) dados.set('longitude', String(item.longitude));
