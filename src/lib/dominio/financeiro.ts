@@ -1,4 +1,4 @@
-import type { Centavos, DataISO } from './tipos';
+import type { Bps, Centavos, DataISO } from './tipos';
 
 /**
  * Regras financeiras.
@@ -100,4 +100,50 @@ export function totalDaVenda(quantidade: string | number, precoUnitario: Centavo
     throw new Error('Quantidade inválida');
   }
   return Math.round((milesimos * precoUnitario) / 1000);
+}
+
+/**
+ * Toda despesa e dividida em tres partes, em basis points (somam 100%):
+ * R$ 200,00 de energia = R$ 60,00 + R$ 60,00 + R$ 80,00.
+ */
+export const DIVISAO_DESPESA: readonly [Bps, Bps, Bps] = [3000, 3000, 4000];
+
+/**
+ * Valor de cada parte da despesa: as tres da divisao e a quarta, da EntuLoc,
+ * que fica com tudo quando ela paga o valor integral. Na divisao, as duas
+ * primeiras arredondam para baixo e a terceira fica com a sobra, entao as
+ * partes sempre somam o valor exato.
+ */
+export function dividirDespesa(
+  valor: Centavos,
+  integralEntuloc = false,
+): [Centavos, Centavos, Centavos, Centavos] {
+  if (integralEntuloc) return [0, 0, 0, valor];
+  const [bps1, bps2] = DIVISAO_DESPESA;
+  const parte1 = Math.floor((valor * bps1) / 10_000);
+  const parte2 = Math.floor((valor * bps2) / 10_000);
+  return [parte1, parte2, valor - parte1 - parte2, 0];
+}
+
+export type ParteDespesa = { valor: Centavos; pagaEm: DataISO | null };
+
+export type StatusDespesa = 'aberta' | 'parcial' | 'paga' | 'vencida';
+
+/** Quanto falta pagar: a soma das partes que ainda nao tiveram baixa. */
+export function aPagarDaDespesa(partes: readonly ParteDespesa[]): Centavos {
+  return partes.reduce((soma, p) => (p.pagaEm ? soma : soma + p.valor), 0);
+}
+
+/**
+ * Situacao pela baixa de cada parte. Parte de valor zero (a quarta numa despesa
+ * dividida, ou sobra de centavo da divisao) nao precisa de baixa. Vence NO dia, como as cobrancas.
+ */
+export function statusDespesa(
+  partes: readonly ParteDespesa[],
+  vencimentoEm: DataISO,
+  hoje: DataISO,
+): StatusDespesa {
+  if (aPagarDaDespesa(partes) === 0) return 'paga';
+  if (hoje > vencimentoEm) return 'vencida';
+  return partes.some((p) => p.pagaEm) ? 'parcial' : 'aberta';
 }

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aPagarDaDespesa,
+  DIVISAO_DESPESA,
+  dividirDespesa,
   resumirCarteira,
   saldoDevedor,
   statusCobranca,
+  statusDespesa,
   totalDaVenda,
   totalRecebido,
   type Cobranca,
@@ -169,5 +173,68 @@ describe('totalRecebido', () => {
       { valor: 33_334, recebidoEm: HOJE },
     ]);
     expect(r).toBe(100_000);
+  });
+});
+
+describe('dividirDespesa', () => {
+  it('divide em 30%, 30% e 40%, sem nada para a EntuLoc', () => {
+    expect(dividirDespesa(20_000)).toEqual([6_000, 6_000, 8_000, 0]);
+  });
+
+  it('EntuLoc pagando o valor integral leva tudo na quarta parte', () => {
+    expect(dividirDespesa(20_000, true)).toEqual([0, 0, 0, 20_000]);
+  });
+
+  it('a divisao soma 100%', () => {
+    expect(DIVISAO_DESPESA.reduce((s, bps) => s + bps, 0)).toBe(10_000);
+  });
+
+  it('o centavo que sobra vai para a ultima parte', () => {
+    expect(dividirDespesa(10_001)).toEqual([3_000, 3_000, 4_001, 0]);
+    expect(dividirDespesa(1)).toEqual([0, 0, 1, 0]);
+  });
+
+  it('as partes sempre somam o valor', () => {
+    for (const valor of [1, 7, 99, 3_333, 12_345, 99_999, 1_000_001]) {
+      for (const integral of [false, true]) {
+        const partes = dividirDespesa(valor, integral);
+        expect(partes.reduce((s, p) => s + p, 0)).toBe(valor);
+        expect(partes.every((p) => Number.isInteger(p) && p >= 0)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('baixa das partes da despesa', () => {
+  const partes = (...pagas: (string | null)[]) =>
+    [6_000, 6_000, 8_000].map((valor, i) => ({ valor, pagaEm: pagas[i] ?? null }));
+
+  it('sem baixa, falta tudo e esta em aberto', () => {
+    expect(aPagarDaDespesa(partes())).toBe(20_000);
+    expect(statusDespesa(partes(), HOJE, HOJE)).toBe('aberta');
+  });
+
+  it('baixa de uma parte deixa parcial e desconta so ela', () => {
+    expect(aPagarDaDespesa(partes(null, HOJE))).toBe(14_000);
+    expect(statusDespesa(partes(null, HOJE), HOJE, HOJE)).toBe('parcial');
+  });
+
+  it('paga so com as tres partes baixadas', () => {
+    expect(statusDespesa(partes(HOJE, HOJE), HOJE, HOJE)).toBe('parcial');
+    expect(statusDespesa(partes(HOJE, HOJE, HOJE), '2026-01-01', HOJE)).toBe('paga');
+  });
+
+  it('vence no dia seguinte ao vencimento, mesmo com parte paga', () => {
+    expect(statusDespesa(partes(), '2026-09-17', HOJE)).toBe('vencida');
+    expect(statusDespesa(partes(HOJE), '2026-09-17', HOJE)).toBe('vencida');
+  });
+
+  it('parte de valor zero nao precisa de baixa', () => {
+    const centavo = [
+      { valor: 0, pagaEm: null },
+      { valor: 0, pagaEm: null },
+      { valor: 1, pagaEm: HOJE },
+    ];
+    expect(statusDespesa(centavo, HOJE, HOJE)).toBe('paga');
   });
 });

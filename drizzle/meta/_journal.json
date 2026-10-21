@@ -85,6 +85,27 @@
       "when": 1791487672061,
       "tag": "0011_faulty_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792617412406,
+      "tag": "0012_free_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792617778332,
+      "tag": "0013_despesas_baixa_por_parte",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792618041290,
+      "tag": "0014_same_spectrum",
+      "breakpoints": true
     }
   ]
 }

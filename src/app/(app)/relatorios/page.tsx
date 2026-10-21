@@ -20,25 +20,11 @@ import { cacambas, clientes, cobrancas, locacoes, prorrogacoes, recebimentos } f
 import { formatarBRL } from '@/lib/dinheiro';
 import { periodoDaFatura } from '@/lib/dominio/faturamento';
 import { hojeEmSaoPaulo, STATUS_ATIVOS } from '@/lib/dominio/locacao';
+import { MESES, mesVizinho } from '@/lib/mes';
 import { exigirPermissaoPagina } from '@/server/auth/guarda';
 
 export const metadata = { title: 'Relatórios' };
 export const dynamic = 'force-dynamic';
-
-const MESES = [
-  'janeiro',
-  'fevereiro',
-  'março',
-  'abril',
-  'maio',
-  'junho',
-  'julho',
-  'agosto',
-  'setembro',
-  'outubro',
-  'novembro',
-  'dezembro',
-];
 
 const FORMAS: Record<string, string> = {
   pix: 'Pix',
@@ -53,12 +39,6 @@ const ORIGENS: Record<string, string> = {
   venda_material: 'Venda de material',
   fatura: 'Faturas',
 };
-
-function mesVizinho(mes: string, delta: number): string {
-  const [ano, m] = mes.split('-').map(Number);
-  const d = new Date(Date.UTC(ano, m - 1 + delta, 1));
-  return d.toISOString().slice(0, 7);
-}
 
 /** Dia (no fuso da operacao) em que um timestamp aconteceu. */
 const diaSP = (coluna: AnyColumn) => sql`(${coluna} at time zone 'America/Sao_Paulo')::date`;

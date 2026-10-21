@@ -589,6 +589,43 @@ export const recebimentos = pgTable(
   (t) => [check('recebimentos_valor_positivo', sql`${t.valor} > 0`)],
 );
 
+/**
+ * Despesa da empresa, ja dividida nas tres partes de DIVISAO_DESPESA, ou toda
+ * na quarta parte quando a EntuLoc paga o valor integral. As partes ficam
+ * congeladas no lancamento: mudar a divisao depois nao reescreve despesa
+ * passada. Cada parte tem a propria baixa (`parteNPagaEm`, nula ate ser paga).
+ */
+export const despesas = pgTable(
+  'despesas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    descricao: text('descricao').notNull(),
+    valor: integer('valor').notNull(), // centavos
+    parte1: integer('parte_1').notNull(),
+    parte2: integer('parte_2').notNull(),
+    parte3: integer('parte_3').notNull(),
+    /** EntuLoc pagando o valor integral; zero quando a despesa e dividida. */
+    parte4: integer('parte_4').notNull().default(0),
+    parte1PagaEm: date('parte_1_paga_em'),
+    parte2PagaEm: date('parte_2_paga_em'),
+    parte3PagaEm: date('parte_3_paga_em'),
+    parte4PagaEm: date('parte_4_paga_em'),
+    vencimentoEm: date('vencimento_em').notNull(),
+    registradoPorId: uuid('registrado_por_id').references(() => usuarios.id, {
+      onDelete: 'set null',
+    }),
+    criadoEm,
+  },
+  (t) => [
+    check('despesas_valor_positivo', sql`${t.valor} > 0`),
+    check(
+      'despesas_partes_somam_valor',
+      sql`${t.parte1} >= 0 AND ${t.parte2} >= 0 AND ${t.parte3} >= 0 AND ${t.parte4} >= 0
+       AND ${t.parte1} + ${t.parte2} + ${t.parte3} + ${t.parte4} = ${t.valor}`,
+    ),
+  ],
+);
+
 export const cobrancasRelations = relations(cobrancas, ({ one, many }) => ({
   cliente: one(clientes, { fields: [cobrancas.clienteId], references: [clientes.id] }),
   locacao: one(locacoes, { fields: [cobrancas.locacaoId], references: [locacoes.id] }),
